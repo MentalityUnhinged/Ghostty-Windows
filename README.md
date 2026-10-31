@@ -6,7 +6,8 @@ This is not an official Ghostty Windows release and does not yet have full
 feature parity. The original engine history and MIT license are retained.
 
 See [Windows build instructions](windows/README.md) and
-[port status and verification](windows/PORTING.md). The latest tested preview
+[port status and verification](windows/PORTING.md). The comprehensive outstanding
+feature backlog is in [TODO.md](TODO.md). The latest tested preview
 is **0.6.1**, with **177 passing checks**. Build outputs and local test artifacts
 are intentionally excluded from Git.
 

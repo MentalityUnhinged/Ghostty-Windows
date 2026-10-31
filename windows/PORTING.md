@@ -108,6 +108,8 @@ unchanged. Shell and startup-folder options are consumed only by new sessions.
 
 ## Remaining release criteria
 
+The detailed, categorized backlog is maintained in [TODO.md](../TODO.md).
+
 Before this can meet the requested "fully featured Windows Ghostty" goal:
 
 1. Extend Kitty graphics beyond the now-tested inline image path: Unicode

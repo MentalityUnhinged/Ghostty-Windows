@@ -161,6 +161,9 @@ remain outstanding.
 
 ## Remaining work before full parity
 
+See the [comprehensive Windows backlog](../TODO.md) for missing features,
+partial integrations, verification work and release criteria.
+
 This frontend is not a completed full-featured port. In particular:
 
 - Kitty Unicode-placeholder placements, animation playback and external file/shared-memory
