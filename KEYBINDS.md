@@ -27,6 +27,10 @@ Preview 0.8.0 features; the corresponding source changes may not yet be publishe
 Window cycling requires more than one terminal window and restores minimized
 windows before activation. Windows controls whether an application can take focus.
 
+The compact tab strip appears automatically with two or more tabs and disappears
+when only one remains. **Ctrl+Shift+T** opens a second tab while the strip is
+hidden; tab navigation and closing shortcuts continue to work.
+
 ## Split panes
 
 | Binding | Action |
@@ -77,6 +81,18 @@ shortcut. Clipboard and selection behavior also follows the Settings preferences
 Plus and Minus refer to the main keyboard OEM plus/equal and minus keys; numpad
 Add/Subtract are not bound. Keyboard layout affects the physical keys used.
 
+### Minimal interface: hiding and restoring the toolbar
+
+| Keys / action | Result |
+| --- | --- |
+| Ctrl+Shift+P, search `Show toolbar`, then Enter | Toggle the top toolbar on or off |
+| Ctrl+, | Open Settings, including when the toolbar is hidden |
+| Settings → Show the top toolbar | Save the toolbar visibility preference |
+
+`Show toolbar` is a command-palette action, without a dedicated single shortcut.
+Its visibility preference applies immediately to open windows and persists across
+launches. All keyboard shortcuts remain available with the toolbar hidden.
+
 ## Search, palette and dialogs
 
 | Context | Binding | Action |
@@ -119,7 +135,7 @@ be set to context menu, paste, copy, copy-or-paste or none in Settings.
 Use **Ctrl+Shift+P**, then search for the action name. Commands include terminal
 reset; application mouse-reporting toggle; exact font size; copying the tab title;
 screen, selection, scrollback and styled HTML exports; searching selected text;
-equalizing splits; always-on-top; decorations; resetting window size;
+equalizing splits; showing/hiding the toolbar; always-on-top; decorations; resetting window size;
 focus-follows-mouse; named shell-profile tabs; saving the workspace; scrolling to
 selection or a row; previous/next shell prompt; and opening, reloading, resetting,
 exporting or importing preferences.
