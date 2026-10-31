@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks><PlatformTarget>x64</PlatformTarget>
+    <AssemblyName>Ghostty.Windows</AssemblyName><ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>0.6.1-preview</Version><Description>Experimental Windows frontend for libghostty-vt</Description>
+    <ApplicationIcon>Assets\ghostty.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup><None Include="native\ghostty-win.dll" CopyToOutputDirectory="PreserveNewest" Link="ghostty-win.dll" /></ItemGroup>
+  <ItemGroup><Resource Include="Assets\ghostty.ico" /><Resource Include="Assets\ghostty.png" /></ItemGroup>
+  <ItemGroup><Compile Remove="tools\**\*.cs" /></ItemGroup>
+</Project>

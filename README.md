@@ -1,3 +1,19 @@
+# Ghostty Windows Preview
+
+Private development copy of [Ghostty](https://github.com/ghostty-org/ghostty),
+with an independent experimental Windows frontend in [`windows/`](windows/README.md).
+This is not an official Ghostty Windows release and does not yet have full
+feature parity. The original engine history and MIT license are retained.
+
+See [Windows build instructions](windows/README.md) and
+[port status and verification](windows/PORTING.md). The latest tested preview
+is **0.6.1**, with **177 passing checks**. Build outputs and local test artifacts
+are intentionally excluded from Git.
+
+The upstream README follows.
+
+---
+
 <!-- LOGO -->
 <h1>
 <p align="center">

@@ -1,0 +1,11 @@
+bin/
+obj/
+dist/
+artifacts/
+native/*.dll
+native/*.lib
+native/*.pdb
+*.zip
+*.zip.backup-*
+tools/**/bin/
+tools/**/obj/
