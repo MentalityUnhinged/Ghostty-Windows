@@ -1,16 +1,18 @@
 # Ghostty Windows and VT engine backlog
 
-Audited **31 October 2026**, against Windows Preview **0.6.1** at
-`c2043513cde2323115c5f5708c87731d0201c97b`, built on upstream Ghostty
+Reconciled **1 November 2026** against the **local Windows Preview 0.13.0**
+source and its tested binaries. Original audit baseline: Preview 0.6.1 at
+`c2043513cde2323115c5f5708c87731d0201c97b` on 31 October. Engine base remains
 `d2865b8f578fa4e85e2f2b85ef97f5ef69de951f`.
 
 This is the comprehensive known outstanding-feature and release-readiness
 backlog for **our Windows application and its Ghostty VT engine**. It includes
 missing engine capabilities, engine limitations, engine-to-host integration
-gaps and frontend features. It covers the checked-in implementation and pinned
+gaps and frontend features. It covers the reconciled Windows implementation and pinned
 upstream source; it does not claim an exhaustive comparison with future releases.
-Every checkbox describes remaining work, including integration and verification
-of features whose basic implementation already exists.
+Unchecked boxes describe remaining work, including integration and verification
+of features whose basic implementation already exists. Checked entries record
+features delivered in the identified preview.
 
 Labels: **Missing** = absent from the named layer; **Partial** = extend or correct
 existing behavior; **Verify** = implementation exists but coverage is incomplete;
@@ -24,6 +26,53 @@ An engine gap can require changing `src/terminal/`, not just `windows/`.
 Unsupported compatibility extensions are included even when the upstream GUI
 also lacks them; they are not all mandatory for matching upstream Ghostty.
 
+## Current picture
+
+| Status | Open groups | Meaning |
+| --- | ---: | --- |
+| Missing | 47 | Absent capabilities or engineering work; some are optional/legacy compatibility |
+| Partial | 43 | Working features with specific extensions, refinements or release work left |
+| Verify | 25 | Coverage still incomplete; this does not mean the feature is absent |
+| Decision | 12 | Product/platform policy to settle before implementation |
+| **Total** | **127** | **Grouped checklist entries, not 127 missing terminal features** |
+
+The published GitHub baseline had **173 open groups** (84 Missing, 49 Partial,
+28 Verify, 12 Decision). This reconciliation leaves **127**. That net reduction
+includes one newly confirmed rectangle-operation gap. Many delivered features
+were subrequirements of a broader group, so a 20-feature batch did not necessarily
+close 20 whole backlog entries. The historical delivery tables are at the end.
+
+**Today's work already delivered:** custom keybindings/precedence/unbind/send
+commands; inspector and local diagnostic exports; host identity/theme reports;
+bounded unknown-protocol capture; complete pinned config/action inventories;
+plus the prior batches of appearance, clipboard, search/export, tab/split/window
+and settings features. The ConPTY read/dispose shutdown race is fixed.
+
+**Evidence:** 442 full regression checks, 71 extended checks and a production
+compression probe passed. Three of the original 28 verification tasks are closed;
+25 retain explicit remaining coverage in [VERIFICATION.md](windows/VERIFICATION.md).
+Those include real hardware/IMEs/accessibility, other OS/WSL environments,
+long-duration stress, fault injection and independent conformance/reference tests.
+Automated check counts are not a claim that those requirements are satisfied.
+
+**Most useful next work:**
+
+1. Core usability: IME preedit/candidate placement, shell integration/state,
+   accessible terminal text and search correctness/navigation.
+2. Configuration parity: upstream config/theme loading, editable profiles,
+   complete palettes and advanced keybinding semantics.
+3. Rendering/protocol parity: shaping/ligatures/font fallback, remaining image
+   features/transports, OSC52, sizing/glyph callbacks and explicit VT gaps.
+4. Desktop/session polish: tab dragging/detachment, named multi-window workspaces,
+   drop-down mode, notifications/taskbar/tray and Explorer integration.
+5. Release readiness: Windows CI, clean-machine builds, installer/signing/update
+   policy, reproducible releases/licensing and the remaining verification matrix.
+
+**Repository/build distinction:** this list describes the implemented Windows
+source and tested local build. A Git commit/push publishes source; it does not
+publish the portable EXE/ZIP as a GitHub Release. Generated builds and local
+traces stay outside Git. Keep this summary in sync when changing the list.
+
 ## Already implemented — do not rebuild these
 
 Real libghostty-vt/ConPTY sessions; PowerShell/CMD/default-WSL profiles; tabs and
@@ -35,32 +84,53 @@ paste; mouse/focus reporting; Kitty keyboard events; HTTP/HTTPS and OSC 8 link
 activation; inline Kitty PNG/RGB/RGBA graphics; synchronized image snapshots;
 application/shortcut icons; self-contained portable packaging.
 
-The current suite has **177 passing checks**. That count is a baseline, not proof
+The audit baseline had **177 passing checks**. That count is a baseline, not proof
 of complete interoperability or daily-use readiness.
+
+## Remaining work by area
+
+| Area | Missing | Partial | Verify | Decision |
+| --- | ---: | ---: | ---: | ---: |
+| 1. Correctness and resource ownership — P0 | 0 | 2 | 3 | 0 |
+| 2. Upstream configuration and settings — P1 | 3 | 3 | 0 | 0 |
+| 3. Keyboard bindings and action coverage — P1 | 0 | 1 | 0 | 0 |
+| 4. Keyboard devices and IME — P0/P1 | 1 | 1 | 5 | 0 |
+| 5. Typography and rendering — P1 | 3 | 6 | 1 | 0 |
+| 6. Images and graphics protocols — P1 | 3 | 2 | 2 | 1 |
+| 7. Shell integration and semantic terminal state — P1 | 6 | 2 | 0 | 0 |
+| 8. Clipboard, links, selection and mouse — P1/P2 | 1 | 2 | 2 | 1 |
+| 9. Search and export — P1/P2 | 0 | 5 | 0 | 0 |
+| 10. Tabs, splits, windows and sessions — P1/P2 | 2 | 4 | 0 | 1 |
+| 11. Windows desktop integration — P2 | 6 | 1 | 1 | 1 |
+| 12. Accessibility and localization — P1 | 2 | 2 | 1 | 0 |
+| 13. Diagnostics and developer tools — P1/P2 | 0 | 1 | 0 | 0 |
+| 14. Performance and compatibility validation — P0/P1 | 0 | 1 | 7 | 0 |
+| 15. Build, packaging and release — P0/P1 | 4 | 5 | 0 | 2 |
+| 16. Scope decisions and release exit criteria | 0 | 1 | 0 | 2 |
+| 17. VT engine capabilities and limitations — P1/P2 | 12 | 2 | 0 | 3 |
+| 18. VT engine-to-Windows integration gaps — P1 | 3 | 1 | 0 | 0 |
+| 19. VT protocol completeness and capability accounting — P0/P1 | 1 | 1 | 3 | 1 |
+
+Counts below describe only unchecked backlog entries. Completed entries remain
+visible beside their remaining extensions to preserve context.
 
 ## 1. Correctness and resource ownership — P0
 
-- [ ] **Partial:** Separate the actual upstream engine base from the frontend
-  source commit in `windows/build.ps1` provenance. `upstream_commit` currently
-  records `git rev-parse HEAD`, which now identifies our frontend commit.
-- [ ] **Partial:** Validate the native adapter/managed ABI explicitly at startup,
-  including version, struct sizes and supported capabilities.
+- [x] **Implemented 0.11.0:** Separate the pinned engine base and frontend revision,
+  dirty-source state, engine-tree match and archive rebuild status in provenance.
+- [x] **Implemented 0.12.0:** Validate the native adapter ABI before callbacks or terminal allocation: version, cell/image/system-image sizes, pointer width and required capabilities. Mismatches give matching-build recovery instructions.
 - [ ] **Partial:** Audit native calls that currently discard result codes;
   distinguish absent values from allocation, capacity and protocol failures.
-- [ ] **Partial:** Make renderer, decoder and shell-start failures recoverable
-  per pane where possible instead of shutting down the whole application.
-- [ ] **Partial:** Handle ConPTY writer saturation and broken pipes explicitly;
-  bound queued bytes as well as the existing number of queued messages.
+- [x] **Implemented 0.12.0:** Managed font/renderer/output failures are isolated to their pane with recovery feedback. Drawing contexts are isolated and last-good cell metrics retained; malformed images and failed shell starts remain recoverable. Native access violations and process-wide allocation exhaustion are not masked.
+- [ ] **Partial:** Complete native cleanup-failure handling and fault injection. Input byte/message bounds, reader/writer failure reporting, single-start ownership and monitor settlement are implemented. The 1 November read/dispose race is fixed: pumps settle before stream disposal; ten gated natural-exit cases pass. Remaining descendant/Linux-side/cancellation coverage is V01/V22.
 - [ ] **Verify:** Stress close/reopen, shell exit, failed launches, cancellation,
   Job Object cleanup and reader/writer settlement without orphan processes.
 - [ ] **Verify:** Exercise resize, screen switches and scrollback eviction during
   active selection, image transfer, synchronized output and search.
 - [ ] **Verify:** Exercise rapid focus/tab/split changes with held modifiers,
   composition, mouse capture, open menus and running applications.
-- [ ] **Partial:** Audit file-drop quoting for PowerShell, CMD and WSL separately;
-  the current shared double-quote treatment is not shell-specific escaping.
-- [ ] **Partial:** Make clipboard contention/failure visible and accurately
-  report whether a copy succeeded; current copy paths suppress COM failures.
+- [x] **Implemented 0.12.0:** File-drop insertion is shell-specific: PowerShell literal arguments, CMD quoted arguments with expansion-sensitive names refused, and WSL POSIX arguments after live wslpath translation. Unknown custom-command shells are refused rather than guessed.
+- [x] **Implemented 0.12.0:** Copy failure is reported and selection cleared only after success. Clipboard-read contention is visible; unknown clipboard availability permits an explicit retry instead of being treated as empty.
 
 ## 2. Upstream configuration and settings — P1
 
@@ -68,47 +138,40 @@ of complete interoperability or daily-use readiness.
   explicit compatibility/version policy alongside existing Windows JSON settings.
 - [ ] **Missing:** Implement config discovery, includes, precedence, repeated
   options, defaults, conditional settings and useful source-located diagnostics.
-- [ ] **Missing:** Add open-config, reload-config and file-change reload actions;
-  define which options update live and which require a new session.
-- [ ] **Missing:** Import upstream theme files/catalogs and complete ANSI palettes,
-  cursor, selection and search colors; existing themes change only default FG/BG.
-- [ ] **Missing:** Support separate light/dark terminal themes and automatic
+- [x] **Implemented 0.11.0:** Opt-in automatic JSON reload, debounce and nonfatal recovery. Upstream text-config parsing/discovery is tracked separately above; it does not make JSON reload unfinished.
+- [ ] **Partial:** Import upstream theme files/catalogs and apply complete per-theme ANSI palettes. Cursor, cursor-text, selection and search colors are already configurable; automatic light/dark terminal themes also work. Theme-file/palette parity remains.
+- [x] **Implemented 0.9.0:** Support separate light/dark terminal themes and automatic
   switching without changing the Windows-following native title-bar behavior.
 - [ ] **Missing:** Add editable shell profiles: executable, arguments, environment,
   initial command, startup folder and optional wait-after-exit behavior.
-- [ ] **Partial:** Expose scrollback/image limits and policies instead of fixed
-  adapter constants; preserve explicit unlimited/unspecified semantics where valid.
-- [ ] **Missing:** Expose cursor appearance/blink, cell metrics, padding, scroll
-  multiplier, selection colors/word boundaries and mouse-behavior preferences.
-- [ ] **Missing:** Expose background image/opacity/blur and inactive-pane styling
-  once their renderer/platform integrations exist.
-- [ ] **Partial:** Add settings reset/defaults, import/export, versioned migration
-  and conflict handling when another window or editor changes the same file.
-- [ ] **Partial:** Validate unavailable fonts, unsupported themes and profile
-  definitions with actionable diagnostics instead of silent fallback alone.
-- [ ] **Missing:** Publish a per-option support matrix for `src/config/Config.zig`;
-  label implemented, ignored, unsupported and platform-inapplicable settings.
+- [ ] **Partial:** Expose scrollback line limits and additional image/cache
+  policies. Byte limits with explicit default/unlimited/disabled semantics
+  landed in 0.8.0.
+- [x] **Implemented 0.12.0:** Expose cursor appearance/blink, cell metrics/padding, scroll command amounts, selection/search colors, custom Unicode word boundaries, repeat-click preferences and local mouse policies.
+- [x] **Implemented 0.9.0-0.12.0:** Acrylic/background image appearance controls and inactive content dimming are delivered. Remaining transparency/blur/fill and animated-background work is tracked once in section 5.
+- [ ] **Partial:** Add versioned preference migration and concurrent edit conflict
+  handling. Reset/defaults and import/export landed in 0.8.0.
+- [x] **Implemented 0.12.0:** Regular/style font families, named themes, font sizes and built-in default profiles are validated with actionable errors instead of silent substitution. Editable custom profiles remain a separate missing feature.
+- [x] **Implemented 0.13.0:** Complete 219-field pinned [configuration inventory](windows/CONFIG_SUPPORT.md), with source identity and explicit Windows-equivalent/unsupported status. No unsupported syntax is silently treated as implemented or platform-inapplicable.
 
 ## 3. Keyboard bindings and action coverage — P1
 
-- [ ] **Missing:** User-defined keybindings, remapping and configurable shortcut
-  precedence between the application and terminal input.
-- [ ] **Missing:** Key sequences/chords, action chains, key tables, one-shot tables,
-  unbind, global/all-surface and performable binding semantics.
-- [ ] **Missing:** Configurable send-text, CSI, escape and cursor-key actions.
-- [ ] **Missing:** Terminal reset, clear-screen, read-only and toggle-mouse-reporting
+- [x] **Implemented 0.13.0:** JSON single-chord bindings, remapping via unbind, validated modifiers/conflicts, configurable application/terminal precedence, effective palette labels and reserved recovery shortcuts.
+- [ ] **Partial:** Single chords and unbind are implemented. Key sequences, action chains, key tables, one-shot tables and global/all-surface/performable semantics remain.
+- [x] **Implemented 0.13.0:** UTF-8 send-text, CSI/escape prefixes and native cursor-key encoding actions, respecting read-only/input policy.
+- [x] **Implemented 0.7.0:** Terminal reset, clear-screen, read-only and toggle-mouse-reporting
   actions with documented effects on history and child applications.
-- [ ] **Partial:** Font reset/set-size actions and consistent font zoom across
-  panes/windows sharing settings; zoom currently refreshes only the active view.
-- [ ] **Missing:** Scroll-to-top/bottom/selection/row and configurable fractional
-  page/line scrolling actions beyond the current wheel/PageUp/PageDown controls.
-- [ ] **Missing:** Keyboard adjustment/extension of selections and search-selection.
-- [ ] **Missing:** Copy title, formatted copy and selectable screen/selection export
-  actions in addition to existing plain selection copy and scrollback export.
-- [ ] **Partial:** Make the command palette cover implemented actions consistently,
-  show shortcuts/availability and support richer keyboard navigation.
-- [ ] **Missing:** Publish an action support matrix against `src/input/Binding.zig`,
-  including deliberate Windows equivalents for platform-specific actions.
+- [x] **Implemented 0.7.0:** Font reset/set-size actions and consistent font zoom
+  across panes/windows sharing settings.
+- [x] **Implemented 0.9.0:** Configurable fractional page/line command actions;
+  scroll-to-selection/row landed in 0.8.0 and top/bottom in 0.7.0.
+- [x] **Implemented 0.9.0:** Home/End/Page selection actions beyond the arrow-key
+  selection extension delivered in 0.8.0; search-selection landed in 0.7.0.
+- [x] **Implemented 0.10.0:** Formatted HTML clipboard and HTML/ANSI region exports.
+  HTML scrollback export landed in 0.8.0; title copy and plain-text viewport/
+  selection export landed in 0.7.0.
+- [x] **Implemented 0.12.0:** Palette covers implemented command actions, including tab/selection/search/preview and clipboard actions. One chord owner supplies matching and labels, and availability/state notifications refresh while the palette is open.
+- [x] **Implemented 0.13.0:** Complete pinned [88-action inventory](windows/ACTION_SUPPORT.md), with explicit Windows equivalents and unsupported payload/platform behavior.
 
 ## 4. Keyboard devices and IME — P0/P1
 
@@ -126,27 +189,25 @@ of complete interoperability or daily-use readiness.
   shells, multiplexers and nested sessions, including mode push/pop and repeats.
 - [ ] **Verify:** Cover legacy modifyOtherKeys and application-keypad/cursor modes
   through real applications, not only native encoder fixtures.
-- [ ] **Missing:** User-facing on-screen keyboard action and a documented approach
-  to Windows-reserved shortcuts and global hotkeys.
+- [x] **Implemented 0.12.0:** Windows on-screen keyboard action is available; Windows-reserved and global-shortcut boundaries are documented in KEYBINDS.md. No global hook or reserved-key override is installed.
 
 ## 5. Typography and rendering — P1
 
 - [ ] **Missing:** Shape font runs across cells, with ligatures and font features,
   while preserving terminal cell geometry and selection/cursor placement.
-- [ ] **Missing:** Separate regular/bold/italic/bold-italic families/styles,
+- [ ] **Partial:** Separate bold/italic families landed in 0.9.0, bold-italic in 0.10.0;
   variable-font axes, feature settings and configurable synthetic styles.
 - [ ] **Missing:** Codepoint-to-font mappings and richer font discovery/fallback
   diagnostics, including Nerd Fonts and color emoji behavior.
 - [ ] **Partial:** Render underline variants/colors, overlines and other decoration
   details currently collapsed or omitted by the adapter's style flags.
-- [ ] **Partial:** Implement cursor blink timing, explicit cursor colors/opacity,
-  cursor text contrast and configurable focus/unfocus behavior.
+- [x] **Implemented 0.12.0:** Cursor colors/opacity, focus appearance, explicit/automatic block-cursor text contrast and opt-in application-controlled blink are implemented. The adapter preserves the native blinking/steady flag and application cursor visibility.
 - [ ] **Partial:** Audit text blink, wide glyph clipping, combining sequences,
   emoji presentation and adjacent-cell overdraw against upstream behavior.
-- [ ] **Missing:** Configurable cell width/height, baseline, line thickness,
-  padding/balancing and minimum text contrast.
-- [ ] **Missing:** Background images, fit/repeat/position controls and opacity.
-- [ ] **Missing:** Window transparency/blur and inactive-split dimming/fill.
+- [x] **Implemented 0.12.0:** Cell multipliers, baseline offset, decoration thickness, balanced padding and palette-based minimum text contrast are configurable. Contrast is best-achievable against cell colors, not a promise about a translucent desktop backdrop.
+- [ ] **Partial:** Background images, fit/repeat/alignment and opacity are implemented, including
+  vertical positioning in 0.12.0. Animated backgrounds remain.
+- [ ] **Partial:** Windows 11 Acrylic blur with adjustable background tint opacity and solid fallback is implemented. Clear unblurred transparency, independent blur strength and inactive-split fill remain. Content dimming landed in 0.9.0.
 - [ ] **Missing:** Custom shader support or an explicit documented alternative.
 - [ ] **Partial:** Optimize render damage, allocations, glyph/image caches and
   URL/search recomputation; benchmark before choosing a new renderer architecture.
@@ -161,8 +222,7 @@ of complete interoperability or daily-use readiness.
   Windows-specific resource lifetime and access policy.
 - [ ] **Partial:** Audit relative/virtual placements, placement identifiers,
   deletion variants, image queries/replies and transmission corner cases.
-- [ ] **Partial:** Expose image storage limits and define managed decoded-image
-  cache budgets alongside the existing native storage limit.
+- [ ] **Partial:** Add explicit managed decoded-image cache budgets and cache-pressure policy. Native image storage limits are already configurable with default/unlimited/disabled semantics.
 - [ ] **Verify:** Exercise malformed/chunked/compressed payloads, allocation
   failure, eviction, reflow, resize, scrollback and alternate-screen transitions.
 - [ ] **Verify:** Run interoperability tests with real image tools and multiplexers;
@@ -176,8 +236,8 @@ of complete interoperability or daily-use readiness.
   PowerShell, CMD where feasible, and supported shells inside WSL.
 - [ ] **Missing:** Prompt/command boundaries, command execution state, exit status
   and command duration surfaced in the Windows UI.
-- [ ] **Missing:** Previous/next prompt navigation and select/copy command output
-  using the engine's semantic markers.
+- [ ] **Partial:** Add select/copy semantic command output. Previous/next prompt
+  navigation using existing OSC 133 markers landed in 0.8.0.
 - [ ] **Missing:** Click-to-move-cursor at supported shell prompts.
 - [ ] **Missing:** Shell-driven cursor behavior, title policy and integration
   feature switches with graceful behavior in unsupported shells.
@@ -194,23 +254,17 @@ of complete interoperability or daily-use readiness.
   limits, confirmation/grants and failure responses.
 - [ ] **Decision:** Determine scope for newer clipboard protocols exposed by the
   pinned engine; document unsupported operations instead of silently claiming parity.
-- [ ] **Missing:** Configurable clipboard transforms, trailing-space policy,
-  formatted copy and separate copy-selection/title/URL actions.
-- [ ] **Partial:** Improve paste protection around bracketed-paste safety, escape
-  filtering and multiline policy; avoid losing text without clear behavior.
-- [ ] **Missing:** Configurable right/middle-click actions and primary-selection
-  equivalents appropriate to Windows.
-- [ ] **Missing:** Configurable word boundaries, click-repeat behavior,
-  clear-on-copy/typing and semantic-output selection gestures.
-- [ ] **Missing:** Selection extension by keyboard and convenient scroll-to-selection.
+- [x] **Implemented 0.10.0-0.12.0:** Clipboard whitespace/newline policies, formatted selection copy, screen/history copy and last-hovered URL copy are delivered. Configurable link matching remains a separate item below.
+- [x] **Implemented 0.12.0:** Paste controls have explicit Reject/Strip policies, visible removal counts and no silent ESC removal. Multiline confirmation can remain mandatory in bracketed mode; single-line paste preserves text while normalizing line breaks.
+- [x] **Implemented 0.12.0:** Opt-in Ghostty-local primary selection is separate from the Windows clipboard, shared across panes/windows in this process, bounded to 8 MiB and never persisted. Middle-click and palette primary paste use the same paste policy.
+- [x] **Implemented 0.8.0-0.12.0:** Word boundaries, repeat-click preferences and clear-on-copy/typing are delivered. Remaining semantic command-output selection is tracked once in section 7.
+- [x] **Implemented 0.8.0:** Arrow-key selection extension and scroll-to-selection.
 - [ ] **Partial:** Replace heuristic-only URL handling with configurable matchers,
   and define file/line/email link handling and launch policy before enabling it.
 - [ ] **Partial:** Consider full logical-line link detection outside the viewport;
   current detection deliberately skips truncated URLs.
-- [ ] **Partial:** Add stronger link affordances/previews and keep hover state
-  accurate when modifiers, output or viewport change without mouse movement.
-- [ ] **Missing:** Hide pointer while typing and configurable mouse reporting,
-  Shift-override behavior and scroll speed/precision.
+- [x] **Implemented 0.12.0:** HTTP(S) links have tooltip/hand previews that refresh on output, viewport, layout, pointer re-entry and modifier changes. Last-hovered address copy is available without launching a browser.
+- [x] **Implemented 0.12.0:** Shift-for-local-mouse override is configurable; hide-pointer-on-typing, local mouse reporting and wheel speed/precision remain available.
 - [ ] **Verify:** Physical selection/autoscroll, capture loss, browser activation,
   copy-on-select and clipboard contention across real applications and displays.
 - [ ] **Verify:** Expand touchpad/high-resolution wheel, touch, pen and horizontal
@@ -220,32 +274,36 @@ of complete interoperability or daily-use readiness.
 
 - [ ] **Partial:** Unify search-result navigation and rendered highlighting so
   matching rules agree across Unicode and soft-wrapped lines.
-- [ ] **Missing:** Previous-result controls, search-selection, case/whole-word
+- [ ] **Partial:** Previous-result controls and case/whole-word
   options and optional regex search with useful error reporting.
+  Search-selection landed in 0.7.0.
 - [ ] **Partial:** Distinguish the active result from other matches and expose
   current-result position/count and wraparound state accessibly.
 - [ ] **Partial:** Move expensive search work off the UI path with cancellation;
   current engine search runs synchronously under the terminal lock.
-- [ ] **Missing:** Export visible screen or selection separately, including optional
-  styled/HTML output and configurable open-in-editor behavior.
+- [x] **Implemented 0.10.0:** Styled screen/selection HTML and ANSI exports plus optional
+  open-after-export using the default Windows application.
 - [ ] **Partial:** Add cancellation, capacity handling and actionable IO errors for
   large search/export operations.
 
 ## 10. Tabs, splits, windows and sessions — P1/P2
 
-- [ ] **Missing:** Reorder tabs by dragging/keyboard, detach tabs into new windows
+- [ ] **Partial:** Reorder tabs by dragging, detach tabs into new windows
   and move tabs/panes between windows without replacing live sessions.
-- [ ] **Missing:** Split zoom/unzoom, equalize splits and keyboard resizing.
-- [ ] **Partial:** Spatial split navigation; current arrow shortcuts cycle the
-  pane list rather than selecting the visually adjacent pane.
-- [ ] **Missing:** Tab overview, configurable tab placement/visibility and richer
-  title customization for panes, tabs and windows.
-- [ ] **Missing:** Undo/reopen closed surfaces with a defined lifetime policy;
+  Keyboard/action tab reordering landed in 0.7.0.
+- [x] **Implemented 0.8.0:** Keyboard split-divider resizing. Zoom/unzoom and
+  equal-area split equalization landed in 0.7.0.
+- [x] **Implemented 0.7.0:** Spatial split navigation selects the visually
+  adjacent pane instead of cycling the pane list.
+- [ ] **Partial:** Tab overview, top/bottom placement, visibility, title length and
+  close-button policies landed in 0.10.0. Richer pane/window title templates remain.
+- [ ] **Partial:** Reopen closed tab recipes with fresh shells landed in 0.10.0;
+  persistent undo and closed-pane reopening remain.
   destroyed ConPTY processes cannot simply be resumed.
-- [ ] **Partial:** Preserve/restore pre-fullscreen window style, bounds and state
-  rather than always returning to a normal window.
-- [ ] **Missing:** Always-on-top, decorations visibility, reset-window-size,
-  focus-follows-mouse and window-switching actions.
+- [x] **Implemented 0.7.0:** Preserve/restore pre-fullscreen window style, bounds,
+  resize mode and state.
+- [x] **Implemented 0.8.0:** Window-switching actions. Always-on-top, decorations,
+  reset-window-size and focus-follows-mouse landed in 0.7.0.
 - [ ] **Partial:** Persist monitor identity/position and restore safely when monitor
   topology, DPI or work areas change.
 - [ ] **Missing:** Multi-window workspace collections and named workspace management;
@@ -255,8 +313,7 @@ of complete interoperability or daily-use readiness.
   is not implied by layout restoration.
 - [ ] **Missing:** Single-instance routing and CLI requests to open a tab/window
   or launch a command in a selected existing instance.
-- [ ] **Partial:** Make session limits configurable where appropriate and expose
-  capacity/error feedback consistently even when the status bar is hidden.
+- [x] **Implemented 0.12.0:** Per-window tab/pane limits can be lowered within the 20-tab/64-pane hard workspace bounds. New tab, split, duplicate and reopen paths honor them; capacity notices remain visible with the status bar hidden. Existing restored sessions are preserved.
 
 ## 11. Windows desktop integration — P2
 
@@ -270,8 +327,9 @@ of complete interoperability or daily-use readiness.
   default-terminal support where Windows exposes the required contract.
 - [ ] **Missing:** Explicit PowerShell 7 and named WSL distribution/profile discovery,
   rather than only the three hardcoded launch profiles.
-- [ ] **Missing:** Windows-friendly command-line flags for command, directory,
-  profile, title and diagnostics, with documented quoting and exit behavior.
+- [x] **Implemented 0.11.0:** Windows CLI flags for command, directory, profile,
+  title, dimensions, maximize/fullscreen, help and diagnostics, with transient
+  launch and explicit process-command-line semantics.
 - [ ] **Decision:** URL/protocol registration and associated-file handling; enable
   only deliberately supported entry points.
 - [ ] **Partial:** Complete window-theme/high-contrast behavior for app-owned chrome;
@@ -294,14 +352,10 @@ of complete interoperability or daily-use readiness.
 
 ## 13. Diagnostics and developer tools — P1/P2
 
-- [ ] **Missing:** A useful terminal inspector for modes, cursor, rendering,
-  input/protocol events and per-pane performance/resource state.
-- [ ] **Partial:** Structured, bounded diagnostics and crash reports with artifact
-  identity and a deliberate policy for terminal contents and sensitive data.
-- [ ] **Missing:** User-facing diagnostics export and clear reporting of unsupported
-  configuration, protocol integration and native capability mismatches.
-- [ ] **Partial:** Document support boundaries and an actionable failure path for
-  shell launch, settings, renderer, clipboard and export failures.
+- [x] **Implemented 0.13.0:** Inspector exposes live modes/cursor/render/geometry, feed timing/bytes, input/queue/cache counters, bounded unknown-protocol events and command availability. Full CPU/GPU/native allocator profiling is not claimed.
+- [ ] **Partial:** Add bounded/rotated production crash reports and deliberate crash-data collection policy. Structured diagnostic exports, artifact hashes, ABI metadata and bounded opt-in protocol capture are implemented. The unhandled-exception errors.log is still an unbounded text log; it is not a structured crash-report subsystem.
+- [x] **Implemented 0.13.0:** Palette/CLI diagnostics export identifies artifacts/ABI/platform, unsupported JSON keys and protocol coverage, preserving partial facts on pane snapshot failures; no default payload/screen/settings/environment capture.
+- [x] **Documented 0.13.0:** README, AUDIT and VERIFICATION document shell/settings/renderer/clipboard/export recovery, native-fault limits and unsupported operations. Additional failure injection remains V22; broad interoperability remains open.
 
 ## 14. Performance and compatibility validation — P0/P1
 
@@ -318,8 +372,7 @@ of complete interoperability or daily-use readiness.
   distinguish upstream engine conformance from Windows frontend coverage.
 - [ ] **Verify:** Cancellation, malformed input, capacity, target/session identity,
   failed cleanup and permission failures at public application boundaries.
-- [ ] **Partial:** Build a repeatable manual interaction matrix for browser launch,
-  clipboard, IME, accessibility and physical pointer/device behavior.
+- [ ] **Partial:** Expand VERIFICATION.md's 28-case ledger into step-by-step manual scripts and record real browser/clipboard/IME/accessibility/device executions. The ledger and automated runner already exist; physical tests have not been signed off.
 
 ## 15. Build, packaging and release — P0/P1
 
@@ -353,8 +406,7 @@ of complete interoperability or daily-use readiness.
   Windows equivalents or intentionally inapplicable, rather than copying them blindly.
 - [ ] **Decision:** Set an explicit target for "feature complete": feature matrix,
   supported configurations, interoperability evidence and accepted exclusions.
-- [ ] **Partial:** Keep this checklist current as items land; record verification
-  evidence before turning a **Verify** item into a completed claim.
+- [x] **Reconciled 2026-11-01:** Checklist matched to the local 0.13.0 source and recorded verification evidence. Keep updating it as work lands; ongoing maintenance is not an unfinished terminal feature.
 - [ ] **Partial:** Resolve P0 correctness issues and document any accepted remaining
   limitations before describing the preview as suitable for daily use.
 
@@ -429,14 +481,10 @@ even when matching the current upstream GUI would not require implementing them.
   pages if required for large-history resize performance.
   [PageList.resize](src/terminal/PageList.zig) explicitly notes that resize
   currently decompresses all nodes and leaves deferred reflow as a TODO.
-- [ ] **Verify — engine/platform:** Validate Windows scrollback compression and
-  memory reclamation capabilities. `PageList` can report compression as
-  unsupported when memory reclamation is unavailable; distinguish supported,
-  disabled and unsupported states before exposing a compression preference.
-- [ ] **Verify — engine:** Review remaining source TODOs and untested boundary
-  paths in screen/page/selection/reflow/formatting code. Record specific
-  externally observable gaps and regression cases; do not convert every
-  maintenance TODO into a supposed missing terminal feature.
+- [x] **Verified 2026-11-01 (V23):** Windows production-archive compression/reclamation is supported on the tested host; incremental/full passes reduce resident page storage and restore identical text. Frontend scheduling remains inactive. See [verification evidence](windows/VERIFICATION.md).
+- [x] **Verified 2026-11-01 (V24):** Reviewed the pinned screen/page/selection/reflow/formatter TODOs, distinguished maintenance debt from observed behavior, and retained specific regression risks. See [verification evidence](windows/VERIFICATION.md).
+
+- [ ] **Missing - engine (verified gap):** DECFRA rectangular fill and DECERA rectangular erase are ignored by the pinned compiled engine. Real-byte negative regression cases record unchanged target cells; do not advertise these as supported. See V26 in windows/VERIFICATION.md.
 
 ## 18. VT engine-to-Windows integration gaps — P1
 
@@ -445,26 +493,19 @@ The engine already exposes these capability families in
 consume or validate them in our adapter/renderer, not to invent another parser.
 Existing related backlog items remain in their owning sections.
 
-- [ ] **Missing — integration:** Supply host-specific enquiry and XTVERSION
-  responses and review device-attribute/terminfo identity against the actual
-  Windows implementation. Audit defaults before overriding them.
+- [x] **Implemented 0.13.0 - integration:** ENQ/XTVERSION identify ghostty-windows and its frontend version; TERM_PROGRAM_VERSION matches. Audited DA defaults retain VT220/ANSI color only and no Sixel/clipboard claims; xterm-256color remains the compatibility terminfo identity.
 - [ ] **Missing — integration:** Connect host size-query and window-resize
   requests to measured cell/pixel/window geometry and a defined resize policy.
-- [ ] **Missing — integration:** Notify the engine of the host color scheme and
-  validate application theme queries/reports when OS or terminal themes change.
+- [x] **Implemented 0.13.0 - integration:** Queries reflect the actual terminal palette; mode 2031 receives changed-theme reports outside the native lock. Auto themes follow OS changes; duplicate/disabled reports are suppressed.
 - [ ] **Missing — integration:** Bridge the engine's glyph protocol into usable
   Windows font/glyph rendering; enabling a protocol flag alone is insufficient.
 - [ ] **Partial — integration:** Audit OSC text-sizing and other rendering metadata
   against the C render API and WPF output; the current cell snapshot does not
   establish complete support for every engine-side text representation.
-- [ ] **Missing — integration:** Connect bounded unknown-sequence reporting to
-  diagnostics so unsupported protocol behavior can be investigated without
-  treating arbitrary terminal payloads as commands.
+- [x] **Implemented 0.13.0 - integration:** Opt-in native unknown OSC/APC capture with 32x256-byte ring, truncation/eviction accounting and Base64 display. Capture is RAM-only; payloads are excluded from default exports and never executed.
 - [ ] **Missing — integration:** Surface engine program-status and hierarchical/
   semantic state where applicable, with typed ownership and explicit unknowns.
-- [ ] **Verify — integration:** Cover terminal continuation/checkpoint/snapshot
-  APIs if used for recovery or persistence. Existing engine APIs do not imply
-  that our workspace restoration already restores terminal state.
+- [x] **Verified 2026-11-01 (V25):** Terminal continuation/checkpoint APIs are not used for persistence. Workspace restoration starts fresh processes; drawing snapshots are not recovery checkpoints. See [verification evidence](windows/VERIFICATION.md).
 
 Other host integrations already tracked above: clipboard read/write and Kitty
 clipboard responses (section 8); bell, desktop notifications and progress
@@ -496,6 +537,245 @@ that the engine is missing all those protocols.
   reference terminals and representative applications. A feature must have
   correct state, rendering and replies; acceptance by the parser alone is not
   evidence of end-to-end implementation.
+
+## Delivery history (completed work)
+
+Historical batch counts describe features delivered at the time. They are not
+additional open tasks and should not be added to the current backlog counts.
+
+### Completed in Preview 0.13.0 and verification follow-up
+
+Nine previously missing groups were delivered: custom single-chord bindings and
+precedence; configurable terminal send actions; configuration and action support
+inventories; live inspector; diagnostics export; host identity; terminal theme
+reports; bounded unknown OSC/APC diagnostics. Unbind advanced the broader binding
+semantics group; sequences, tables, chains and global behavior remain.
+
+The verification pass closed V23 (production compression capability), V24
+(source TODO audit) and V25 (checkpoint/persistence applicability). It fixed the
+ConPTY read/dispose shutdown race and replaced process-created assumptions in a
+workspace test with observed command readiness. 442 regression checks, 71 extended
+checks and the production compression probe passed. Hardware, cross-machine,
+long-duration and broader conformance/fault coverage remains in the 25 Verify
+items, with detailed requirements in windows/VERIFICATION.md.
+
+### Partial-completion pass — Preview 0.12.0
+
+This pass closes **15 of the 62 partial entries**, leaving **47 partial entries**.
+It prioritizes ABI validation, pane recovery, file-drop correctness, settings
+validation, clipboard/paste behavior, cursor/layout controls, mouse policies,
+primary selection, palette coverage and capacity feedback. Other partial entries
+were improved without being marked complete: native formatter errors now preserve
+error categories; input/output pipe failures are surfaced; native word/repeat-click
+options and vertical background alignment are exposed. Remaining native calls,
+cleanup-failure paths, semantic gestures and animated backgrounds still need work.
+
+The process-local primary buffer is a deliberate Windows equivalent, not a
+system-wide X11 primary clipboard. File-drop quoting applies to standalone
+arguments: CMD %/! spellings are refused; WSL requires POSIX-compatible shell
+syntax and uses the default distribution's wslpath rather than assuming /mnt/c.
+Custom single-chord mappings landed in 0.13.0; global/key-table semantics remain missing.
+Renderer recovery covers managed failures, not unsafe native memory faults or
+process-wide allocation exhaustion. Physical hover/device/clipboard interoperability
+checks remain in their Verify entries. No broad VT conformance claim is made.
+
+### Completed in Preview 0.11.0 — fifth batch of 20
+
+| Done | Feature | Access |
+| --- | --- | --- |
+| [x] | CLI shell-profile selection | --profile |
+| [x] | CLI startup directory | --directory |
+| [x] | CLI custom process command line | --command |
+| [x] | CLI initial tab title | --title |
+| [x] | CLI window dimensions | --width / --height |
+| [x] | CLI maximized startup | --maximize |
+| [x] | CLI fullscreen startup | --fullscreen |
+| [x] | CLI help window | --help |
+| [x] | CLI version/platform diagnostics window | --diagnostics |
+| [x] | Background image selection and rendering | Settings picker/path |
+| [x] | Background image opacity | Settings |
+| [x] | Background Cover/Contain/Stretch/Center | Settings |
+| [x] | Background horizontal alignment | Settings |
+| [x] | Background image tiling | Settings |
+| [x] | Automatic settings-file reload | Settings |
+| [x] | Configurable reload debounce | Settings |
+| [x] | Nonfatal reload error notice and recovery | Automatic; click notice to dismiss |
+| [x] | Open working directory in Explorer | Palette |
+| [x] | Copy working directory | Palette |
+| [x] | Open Windows on-screen keyboard | Palette |
+
+CLI overrides open one fresh tab and do not save preferences/workspace on close.
+Custom commands are Windows process command lines, not implicitly shell code;
+select cmd.exe, PowerShell or wsl.exe explicitly for shell syntax. Commands are
+transient and are not restored as persistent custom shell profiles. Help and
+diagnostics are GUI windows, not stdout contracts. Custom commands skip welcome
+bootstrapping. Image decoding is bounded to 64 MiB source/32 million pixels and
+normalized to BGRA32; GIF/multi-frame files display only their first frame.
+Vertical image positioning and animated backgrounds remain outstanding. Background
+files are refreshed when settings are applied, not continuously watched.
+
+Automatic reload is opt-in, debounced and shared by windows with one settings
+owner. It validates one captured JSON document, preserves live workspace state,
+shows errors without applying malformed edits, and clears reload errors on repair.
+It does not merge concurrent edits, install an upstream text-config parser or
+watch directories recursively. Explorer and keyboard-launch UI paths remain
+manual verification scope. See windows/AUDIT.md for the accompanying cleanup.
+
+### Completed in Preview 0.10.0 — fourth batch of 20
+
+| Done | Feature | Access |
+| --- | --- | --- |
+| [x] | Styled HTML selection export | Palette |
+| [x] | Styled HTML visible-screen export | Palette |
+| [x] | ANSI/VT exports for screen, selection and scrollback | Palette |
+| [x] | Formatted HTML selection clipboard with plain-text fallback | Palette |
+| [x] | Configurable copied trailing-whitespace policy | Settings |
+| [x] | Configurable Windows/LF copied line endings | Settings |
+| [x] | Copy visible screen | Palette |
+| [x] | Copy all scrollback | Palette |
+| [x] | Paste as a single line | Palette |
+| [x] | Optional open-after-export | Settings |
+| [x] | Automatic/always/never tab-strip visibility | Settings |
+| [x] | Top/bottom tab-strip placement | Settings |
+| [x] | Tab overview with keyboard activation | Palette |
+| [x] | Configurable Unicode-safe tab title length | Settings |
+| [x] | Optional tab close buttons | Settings |
+| [x] | Optional middle-click tab close | Settings |
+| [x] | Duplicate tab layout with fresh shells | Palette |
+| [x] | Reopen closed tab layout with fresh shells | Ctrl+Alt+Shift+T / palette |
+| [x] | Command-palette page/first/last keyboard navigation | Ctrl+PageUp/PageDown/Home/End |
+| [x] | Dedicated bold-italic font family | Settings |
+
+Preferences are under **Appearance, scrolling, clipboard and tabs**. Reopen keeps
+at most ten tab recipes per live window; it preserves layout, name and current
+supported working directories, creates new identities and processes, and does not
+restore closed processes, output or zoom. Closing the last window discards its
+recipes. Duplicate/reopen respect workspace limits. ANSI exports include native
+palette and styling sequences; HTML exports include the native palette CSS.
+Formatted clipboard data supplies CF_HTML UTF-8 offsets plus plain text; receiving
+application CSS support varies and physical clipboard interoperability remains a
+manual check. Export opening is opt-in and uses the file's default Windows
+application, which may be a browser for HTML. Single-line paste replaces line
+breaks with spaces; it does not quote shell metacharacters or make a command safe.
+Normal text-field Home/End/Page navigation remains available without Ctrl.
+
+### Completed in Preview 0.9.0 — third batch of 20
+
+These are supported frontend capabilities from the outstanding action, rendering
+and preference groups below; completing them does not complete those entire groups.
+
+| Done | Feature | Access |
+| --- | --- | --- |
+| [x] | Configurable line-scroll commands, up/down | Palette; Settings line count |
+| [x] | Configurable fractional-page scrolling, up/down | Palette; Settings fraction |
+| [x] | Extend selection to either line boundary | Ctrl+Alt+Shift+Home/End |
+| [x] | Extend selection to screen boundaries | Ctrl+Alt+Home/End |
+| [x] | Extend selection by pages | Ctrl+Alt+Shift+PageUp/PageDown |
+| [x] | Focused cursor shape override | Settings |
+| [x] | Explicit cursor color | Settings |
+| [x] | Cursor opacity | Settings |
+| [x] | Cursor blink enable/timing | Settings |
+| [x] | Unfocused cursor shape/visibility | Settings |
+| [x] | Selection background color | Settings |
+| [x] | Search highlight background color | Settings |
+| [x] | Inactive pane content dimming | Settings |
+| [x] | Cell width multiplier | Settings |
+| [x] | Cell height multiplier | Settings |
+| [x] | Horizontal terminal padding | Settings |
+| [x] | Vertical terminal padding | Settings |
+| [x] | Automatic light/dark terminal themes | Settings; Windows personalization |
+| [x] | Separate bold font family | Settings |
+| [x] | Separate italic font family | Settings |
+
+The new preferences live under **Cursor, typography, themes and scrolling**.
+Selection boundaries use the native engine's screen/current-line semantics; they
+are not history-wide selection shortcuts. Native applications may hide the cursor;
+shape overrides do not force a hidden cursor visible. Blink is a frontend preference,
+not a claim of full application-controlled blink-mode parity. Color fields use six
+hexadecimal digits. Separate font families must be installed; blank inherits the
+regular family, and bold takes priority when bold and italic are combined. Cell
+multipliers change cell geometry, not glyph shaping or font size. Padding is shared
+by text, images, selection, links and reported mouse coordinates. Inactive dimming
+applies to pane contents, preserving the background material.
+
+### Completed in Preview 0.8.0 — second 20-feature Windows batch
+
+The following are 20 additional usable features. Grouped TODOs below remain
+open when their broader scope is not yet complete.
+
+| Done | Feature | Entry point |
+| --- | --- | --- |
+| [x] | Keyboard resizing of the nearest split divider | Ctrl+Alt+Shift+H/J/K/L |
+| [x] | Cycle terminal windows, restoring minimized state | Ctrl+Alt+PageUp/PageDown |
+| [x] | Scroll to the current selection | Scroll to selection |
+| [x] | Scroll to an absolute history row | Scroll to row |
+| [x] | Previous/next shell prompt navigation | Previous/Next shell prompt |
+| [x] | Extend a selection by keyboard, or start it at the caret | Ctrl+Alt+Shift+arrows |
+| [x] | Styled HTML scrollback export | Export styled scrollback as HTML |
+| [x] | Open the owned Windows settings JSON file | Open settings JSON |
+| [x] | Reload preferences from disk without replacing sessions | Reload settings from disk |
+| [x] | Reset known preferences, keeping sessions and unknown fields | Reset preferences to defaults |
+| [x] | Export preferences separately from workspace state | Export preferences |
+| [x] | Import preferences with backup, keeping the live workspace | Import preferences |
+| [x] | Configurable wheel speed with sub-notch accumulation | Settings: wheel lines |
+| [x] | Hide pointer while typing, restore on mouse interaction | Settings: hide pointer |
+| [x] | Configurable local right-click behavior | Settings: right-click action |
+| [x] | Configurable local middle-click behavior | Settings: middle-click action |
+| [x] | Clear selection after a successful copy | Settings: clear after copy |
+| [x] | Configurable clear/retain selection on typing/paste/drop | Settings: clear on typing |
+| [x] | Configurable scrollback byte limit, including off/unlimited | Settings: scrollback bytes |
+| [x] | Configurable image storage byte limit, including off/unlimited | Settings: image bytes |
+
+Prompt navigation requires OSC 133 shell markers; this does not install shell
+integration. Divider keys move the nearest matching divider by five percentage
+points, bounded to 5–95%, and are disabled while zoomed. Window activation remains
+subject to Windows foreground rules. HTML export uses the engine formatter.
+Preference operations use the existing Windows JSON format, not Ghostty's
+upstream text configuration format. Null limits round-trip explicitly; omitted
+limits retain 64 MiB defaults. Zero limits disable the corresponding storage
+(zero image storage disables Kitty graphics). Changes can discard retained data.
+Native picker/editor launch and physical clipboard interactions retain manual
+verification requirements; automated checks do not claim those were exercised.
+
+### Completed in Preview 0.7.0 — 20-feature Windows batch
+
+These are 20 separately usable features drawn from the grouped items below.
+Compound backlog items remain open where only part of their scope landed.
+Use **Ctrl+Shift+P** to find actions; the palette shows availability, shortcuts
+and toggle state. Implementation: [command catalogue](windows/WindowCommands.cs).
+
+| Done | Feature | Entry point |
+| --- | --- | --- |
+| [x] | Full terminal reset, including history and modes | Reset terminal |
+| [x] | Clear visible terminal screen while retaining history/modes | Ctrl+Shift+K |
+| [x] | Per-pane read-only input mode | Ctrl+Shift+L |
+| [x] | Per-pane application mouse-reporting override | Application mouse reporting |
+| [x] | Reset font size to the loaded/last-applied configured size | Ctrl+Shift+0 |
+| [x] | Validated set-font-size action with shared-pane refresh | Set font size |
+| [x] | Scroll to the top of history | Ctrl+Shift+Home |
+| [x] | Scroll to the current bottom | Ctrl+Shift+End |
+| [x] | Copy full effective tab title | Copy tab title |
+| [x] | Export the visible viewport to plain text | Export visible screen |
+| [x] | Export just the selection to plain text | Export selection |
+| [x] | Search the selected text | Search selected text |
+| [x] | Reorder tabs by keyboard/action without replacing sessions | Ctrl+Shift+PageUp/PageDown |
+| [x] | Zoom/unzoom the active split, retaining the layout | Ctrl+Shift+Z |
+| [x] | Equalize nested split areas | Equalize split areas |
+| [x] | Navigate to spatially adjacent panes | Ctrl+Alt+arrows |
+| [x] | Toggle always-on-top | Always on top |
+| [x] | Toggle native window decorations | Window decorations |
+| [x] | Reset window size | Reset window size |
+| [x] | Focus panes on hover in the active window | Settings / Focus follows mouse |
+
+Fullscreen restoration was also corrected: exiting restores prior bounds,
+window state, decoration style and resize mode. Font changes now have one
+settings owner notifying all associated panes/windows. Clipboard failures are
+reported rather than being presented as successful copies.
+
+Modes and split zoom are per live pane/tab; they are not restored workspace
+properties. Reset/clear act on terminal state, not the running shell process.
+Exports are plain text. Drag tab reordering, tab detachment, styled export,
+Keyboard split resizing landed in 0.8.0; configurable single-chord keybindings landed in 0.13.0.
 
 ## Audit references
 

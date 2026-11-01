@@ -13,6 +13,7 @@ sealed class SystemTitleBar
     readonly Func<bool> prefersDark;
     HwndSource? source;
     bool applying;
+    bool? lastDark;
     SystemTitleBar(Window window, Func<bool>? preference)
     {
         this.window = window; prefersDark = preference ?? ReadDarkPreference;
@@ -44,7 +45,10 @@ sealed class SystemTitleBar
         applying = true;
         try
         {
-            int dark = prefersDark() ? 1 : 0;
+            bool nowDark = prefersDark();
+            if (lastDark != nowDark && window is MainWindow main) main.NotifyTerminalTheme(nowDark);
+            lastDark = nowDark;
+            int dark = nowDark ? 1 : 0;
             // Attribute 19 is the Windows 10 1809 compatibility fallback.
             if (DwmSetWindowAttribute(source.Handle, 20, ref dark, sizeof(int)) < 0)
                 DwmSetWindowAttribute(source.Handle, 19, ref dark, sizeof(int));

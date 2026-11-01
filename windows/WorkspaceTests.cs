@@ -89,7 +89,9 @@ static class WorkspaceTests
         }
         finally { second.Close(); }
         // Exercise the production TerminalView startup path, not only a raw ConPTY helper.
-        using var terminal = new TerminalView(new Settings(),"Command Prompt", directory:folder);
+        // Folder ownership is independent of the welcome bootstrap. Keep this probe
+        // free of a transient PowerShell child that could consume early test input.
+        using var terminal = new TerminalView(new Settings { ShowWelcome = false },"Command Prompt", directory:folder);
         var shellWindow = new Window { Content = terminal, Width = 700, Height = 400, Left = -10000, Top = -10000, ShowInTaskbar = false, ShowActivated = false };
         try
         {
@@ -99,13 +101,19 @@ static class WorkspaceTests
         }
         finally { shellWindow.Close(); terminal.Dispose(); await terminal.Console.Cleanup.WaitAsync(TimeSpan.FromSeconds(10)); }
         var liveSettings = Settings.LoadFile(Path.Combine(artifacts,"live-workspace-settings.json"));
-        liveSettings.ConfirmClose = false; liveSettings.RestoreTabs = false; liveSettings.DefaultProfile = "Command Prompt"; liveSettings.WorkingDirectory = folder;
+        liveSettings.ConfirmClose = false; liveSettings.RestoreTabs = false; liveSettings.ShowWelcome = false; liveSettings.AnimateWelcome = false; liveSettings.DefaultProfile = "Command Prompt"; liveSettings.WorkingDirectory = folder;
         var live = new MainWindow(liveSettings); live.Show();
         var original = live.Active!; TerminalView? neighbor = null;
         try
         {
             for (int i = 0; i < 100 && original.Console.ProcessId == 0; i++) await Task.Delay(25);
             uint pid = original.Console.ProcessId; Check(pid > 0, "Real workspace starts its selected shell");
+            // Process creation is not shell readiness. Probe executed output,
+            // and exclude the welcome child from this ownership-specific test.
+            original.Console.Send("echo GHOSTTY_WORKSPACE_READY\r");
+            bool Ready() => original.Engine.Text().Split('\n').Any(line => line.Trim() == "GHOSTTY_WORKSPACE_READY");
+            for (int i = 0; i < 200 && !Ready(); i++) await Task.Delay(25);
+            Check(Ready(), "Production workspace shell executes a readiness command before split/close");
             live.Split(true); neighbor = live.Active!; await Task.Delay(100);
             Check(original.Console.ProcessId == pid && !ReferenceEquals(original,neighbor), "Creating a split preserves the existing shell owner");
             live.ClosePane(); await neighbor.Console.Cleanup.WaitAsync(TimeSpan.FromSeconds(10));

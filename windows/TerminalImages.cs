@@ -28,9 +28,10 @@ static class TerminalImages
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate void HoldSnapshot(IntPtr userdata);
     // Process-global callback lifetime matches the native library lifetime.
     static readonly DecodePng Decoder = Decode;
+    internal static int SystemImageSize => Marshal.SizeOf<SysImage>();
     public static void Initialize()
     {
-        if (Marshal.SizeOf<NativeImage>() != 88) throw new PlatformNotSupportedException("Unexpected image adapter ABI");
+        NativeAbi.Ensure();
         gw_initialize(Decoder);
     }
     static int Decode(IntPtr allocator, IntPtr pointer, nuint length, ref SysImage image)
@@ -103,7 +104,7 @@ static class TerminalImages
         // Equal-z placements use image/placement identity for deterministic order.
         return result.OrderBy(p => p.Info.Z).ThenBy(p => p.Info.ImageId).ThenBy(p => p.Info.PlacementId).ToArray();
     }
-    internal static void Draw(DrawingContext dc, IEnumerable<Placement> images, double cellWidth, double cellHeight, int cellWidthPixels = 0, int cellHeightPixels = 0)
+    internal static void Draw(DrawingContext dc, IEnumerable<Placement> images, double cellWidth, double cellHeight, int cellWidthPixels = 0, int cellHeightPixels = 0, double paddingX = 10, double paddingY = 8)
     {
         foreach (var image in images)
         {
@@ -111,7 +112,7 @@ static class TerminalImages
             if (p.SourceWidth == 0 || p.SourceHeight == 0 || p.PixelWidth == 0 || p.PixelHeight == 0) continue;
             // Geometry is computed in native cell pixels; the frontend draws in WPF DIPs.
             double scaleX = cellWidth / (cellWidthPixels > 0 ? cellWidthPixels : Math.Ceiling(cellWidth)), scaleY = cellHeight / (cellHeightPixels > 0 ? cellHeightPixels : Math.Ceiling(cellHeight));
-            var target = new Rect(10 + p.Col * cellWidth + p.OffsetX * scaleX, 8 + p.Row * cellHeight + p.OffsetY * scaleY, p.PixelWidth * scaleX, p.PixelHeight * scaleY);
+            var target = new Rect(paddingX + p.Col * cellWidth + p.OffsetX * scaleX, paddingY + p.Row * cellHeight + p.OffsetY * scaleY, p.PixelWidth * scaleX, p.PixelHeight * scaleY);
             var crop = new Int32Rect(checked((int)p.SourceX), checked((int)p.SourceY), checked((int)p.SourceWidth), checked((int)p.SourceHeight));
             var source = new CroppedBitmap(image.Bitmap, crop); source.Freeze();
             dc.DrawImage(source, target);

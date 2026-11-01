@@ -11,7 +11,7 @@ static class ChromeTests
 {
     static void Check(bool condition, string name) { if (!condition) throw new Exception("Chrome check failed: " + name); SelfTest.Passed.Add(name); }
     static bool Dark(Brush brush) => brush is SolidColorBrush b && b.Color.R < 100 && b.Color.G < 100 && b.Color.B < 130;
-    static void Capture(FrameworkElement element, string path)
+    internal static void Capture(FrameworkElement element, string path)
     {
         element.UpdateLayout(); var image = new RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth), (int)Math.Ceiling(element.ActualHeight), 96, 96, PixelFormats.Pbgra32); image.Render(element);
         var pixels = new byte[image.PixelWidth * image.PixelHeight * 4]; image.CopyPixels(pixels, image.PixelWidth * 4, 0);

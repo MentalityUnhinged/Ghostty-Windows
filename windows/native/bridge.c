@@ -12,6 +12,11 @@ typedef struct {
  uint64_t generation; const uint8_t *pixels; size_t length; uint32_t image_id,placement_id;
 } WinImage;
 _Static_assert(sizeof(WinImage)==88,"WinImage ABI changed");
+typedef struct { uint32_t version,cell_size,image_size,system_image_size,pointer_size,capabilities; } WinAbi;
+API int gw_abi(WinAbi *out,uint32_t size) {
+ if(!out || size<sizeof(WinAbi))return GHOSTTY_OUT_OF_SPACE;
+ *out=(WinAbi){2,sizeof(WinCell),sizeof(WinImage),sizeof(GhosttySysImage),sizeof(void*),0xff};return GHOSTTY_SUCCESS;
+}
 typedef int (*WinPngDecode)(const GhosttyAllocator*,const uint8_t*,size_t,GhosttySysImage*);
 typedef void (*WinHoldSnapshot)(void*);
 static WinPngDecode png_decoder;
@@ -23,6 +28,7 @@ API void gw_initialize(WinPngDecode decoder) {
 }
 API void *gw_image_alloc(const GhosttyAllocator *a,size_t n){return ghostty_alloc(a,n);}
 API void gw_image_free(const GhosttyAllocator *a,void *p,size_t n){ghostty_free(a,p,n);}
+typedef struct { uint32_t tag,len,truncated; uint8_t data[256]; } WinUnknown;
 typedef struct {
  GhosttyTerminal term; GhosttyRenderState render;
  GhosttyRenderStateRowIterator rows; GhosttyRenderStateRowCells cells;
@@ -31,7 +37,10 @@ typedef struct {
  GhosttySelectionGesture gesture; GhosttySelectionGestureEvent gesture_events[3];
  WinCell *frame; size_t frame_cap; unsigned char *text; size_t text_cap,text_len;
  unsigned char *replies; size_t reply_cap,reply_len;
+ WinUnknown unknown[32]; uint64_t unknown_total;
+ char identity[128]; size_t identity_len; bool dark;
  bool held; ULONGLONG hold_started;
+ uint64_t repeat_interval; double repeat_distance;
  GhosttyKittyGraphics graphics; GhosttyKittyGraphicsPlacementIterator images;
  WinHoldSnapshot hold_snapshot;void *hold_userdata;
 } WinTerminal;
@@ -44,6 +53,53 @@ static void reply(GhosttyTerminal t,void *u,const uint8_t *data,size_t n) {
  if(n>1024*1024 || w->reply_len>1024*1024-n)return;
  if(reserve((void**)&w->replies,&w->reply_cap,w->reply_len+n)) {
  memcpy(w->replies+w->reply_len,data,n);w->reply_len+=n; }
+}
+static GhosttyString host_identity(GhosttyTerminal t,void *u) {
+ (void)t;WinTerminal *w=u;return (GhosttyString){.ptr=(const uint8_t*)w->identity,.len=w->identity_len};
+}
+static bool host_scheme(GhosttyTerminal t,void *u,GhosttyColorScheme *out) {
+ (void)t;WinTerminal *w=u;*out=w->dark?GHOSTTY_COLOR_SCHEME_DARK:GHOSTTY_COLOR_SCHEME_LIGHT;return true;
+}
+API int gw_host_identity(WinTerminal *w,const uint8_t *data,int len) {
+ if(len<1 || len>=sizeof(w->identity))return GHOSTTY_INVALID_VALUE;
+ for(int i=0;i<len;i++)if(data[i]<32 || data[i]>126)return GHOSTTY_INVALID_VALUE;
+ memcpy(w->identity,data,len);w->identity_len=len;return GHOSTTY_SUCCESS;
+}
+API int gw_host_scheme(WinTerminal *w,int dark) {
+ if(w->dark==(dark!=0))return GHOSTTY_SUCCESS;
+ w->dark=dark!=0;bool enabled=false;
+ GhosttyTerminalModeConfig config={.mode=GHOSTTY_MODE_COLOR_SCHEME_REPORT};
+ GhosttyResult result=ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_MODE,&config);enabled=config.value;
+ if(result!=GHOSTTY_SUCCESS || !enabled)return result;
+ char buf[32];size_t written=0;
+ result=ghostty_color_scheme_report_encode(w->dark?GHOSTTY_COLOR_SCHEME_DARK:GHOSTTY_COLOR_SCHEME_LIGHT,buf,sizeof(buf),&written);
+ if(result==GHOSTTY_SUCCESS)reply(w->term,w,(const uint8_t*)buf,written);return result;
+}
+static void unknown_sequence(GhosttyTerminal t,void *u,const GhosttyTerminalUnknownSequence *seq) {
+ (void)t;WinTerminal *w=u;GhosttyString content;bool truncated;
+ if(seq->tag==GHOSTTY_TERMINAL_UNKNOWN_SEQUENCE_OSC){content=seq->value.osc.content;truncated=seq->value.osc.truncated;}
+ else if(seq->tag==GHOSTTY_TERMINAL_UNKNOWN_SEQUENCE_APC){content=seq->value.apc.content;truncated=seq->value.apc.truncated;}
+ else return;
+ WinUnknown *out=&w->unknown[w->unknown_total++%32];out->tag=seq->tag;out->len=content.len>256?256:content.len;out->truncated=truncated || content.len>256;
+ if(out->len)memcpy(out->data,content.ptr,out->len);
+}
+API int gw_unknown_capture(WinTerminal *w,int enabled) {
+ size_t limit=enabled?256:0;
+ GhosttyResult result=ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_UNKNOWN_MAX_BYTES,&limit);
+ if(result!=GHOSTTY_SUCCESS)return result;
+ result=ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_UNKNOWN_SEQUENCE,enabled?(const void*)unknown_sequence:NULL);
+ if(!enabled){memset(w->unknown,0,sizeof(w->unknown));w->unknown_total=0;}return result;
+}
+API int gw_unknown_count(WinTerminal *w,uint64_t *total) {*total=w->unknown_total;return w->unknown_total>32?32:(int)w->unknown_total;}
+API int gw_unknown_read(WinTerminal *w,int index,uint32_t *tag,uint32_t *truncated,uint8_t *data,int capacity) {
+ uint64_t first=w->unknown_total>32?w->unknown_total-32:0;
+ if(index<0 || (uint64_t)index>=w->unknown_total-first)return -1;
+ WinUnknown *entry=&w->unknown[(first+index)%32];if(capacity<entry->len)return -1;
+ *tag=entry->tag;*truncated=entry->truncated;if(entry->len)memcpy(data,entry->data,entry->len);return entry->len;
+}
+API int gw_mode_query(WinTerminal *w,int number) {
+ GhosttyTerminalModeConfig config={.mode=ghostty_mode_new((uint16_t)number,false)};
+ return ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_MODE,&config)==GHOSTTY_SUCCESS?(config.value?1:0):-1;
 }
 static void render_hold(GhosttyTerminal t,void *u,bool held) {
  WinTerminal *w=u;if(held){ghostty_render_state_update(w->render,t);w->hold_started=GetTickCount64();if(w->hold_snapshot)w->hold_snapshot(w->hold_userdata);}w->held=held;
@@ -70,7 +126,11 @@ API WinTerminal *gw_new(int cols,int rows) {
  ghostty_kitty_graphics_placement_iterator_new(NULL,&w->images)) {gw_free(w);return NULL;}
  if(ghostty_selection_gesture_new(NULL,&w->gesture)){gw_free(w);return NULL;}
  for(int i=0;i<3;i++)if(ghostty_selection_gesture_event_new(NULL,&w->gesture_events[i],(GhosttySelectionGestureEventType)i)){gw_free(w);return NULL;}
+ memcpy(w->identity,"ghostty-windows",15);w->identity_len=15;
  ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_USERDATA,w);
+ ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_ENQUIRY,(const void*)host_identity);
+ ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_XTVERSION,(const void*)host_identity);
+ ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_COLOR_SCHEME,(const void*)host_scheme);
  ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_WRITE_PTY,(const void*)reply);
  ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_RENDER_HOLD,(const void*)render_hold);
  bool pull=false;ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_RESIZE_PULL_SCROLLBACK,&pull);
@@ -121,10 +181,10 @@ API int gw_replies(WinTerminal *w,uint8_t *out,int cap) {
  size_t n=w->reply_len<(size_t)cap?w->reply_len:(size_t)cap;
  if(n){memcpy(out,w->replies,n);memmove(w->replies,w->replies+n,w->reply_len-n);w->reply_len-=n;}return (int)n;
 }
-API void gw_theme(WinTerminal *w,uint32_t fg,uint32_t bg) {
+API int gw_theme(WinTerminal *w,uint32_t fg,uint32_t bg) {
  GhosttyColorRgb f={(fg>>16)&255,(fg>>8)&255,fg&255},b={(bg>>16)&255,(bg>>8)&255,bg&255};
- ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_COLOR_FOREGROUND,&f);
- ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_COLOR_BACKGROUND,&b);
+ int r=ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_COLOR_FOREGROUND,&f);
+ return r?r:ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_COLOR_BACKGROUND,&b);
 }
 API int gw_frame(WinTerminal *w,WinCell **out,uint8_t **text,int *cx,int *cy,int *cursor) {
  if(w->held && GetTickCount64()-w->hold_started>=1000) {
@@ -141,7 +201,7 @@ API int gw_frame(WinTerminal *w,WinCell **out,uint8_t **text,int *cx,int *cy,int
  GhosttyRenderStateCursor cur=GHOSTTY_INIT_SIZED(GhosttyRenderStateCursor);
  ghostty_render_state_get(w->render,GHOSTTY_RENDER_STATE_DATA_CURSOR,&cur);
  *cx=cur.viewport_has_value?cur.viewport_x:0;*cy=cur.viewport_has_value?cur.viewport_y:0;
- *cursor=(cur.viewport_has_value && cur.visible)?1+(int)cur.visual_style:0;
+ *cursor=(cur.viewport_has_value && cur.visible)?(1+(int)cur.visual_style)|(cur.blinking?256:0):0;
  w->text_len=0;size_t index=0;
  ghostty_render_state_get(w->render,GHOSTTY_RENDER_STATE_DATA_ROW_ITERATOR,&w->rows);
  while(ghostty_render_state_row_iterator_next(w->rows)) {
@@ -180,13 +240,28 @@ API void gw_scroll(WinTerminal *w,int delta) {
  GhosttyTerminalScrollViewport b={.tag=delta==0?GHOSTTY_SCROLL_VIEWPORT_BOTTOM:GHOSTTY_SCROLL_VIEWPORT_DELTA};
  b.value.delta=delta;ghostty_terminal_scroll_viewport(w->term,b);
 }
+API void gw_scroll_edge(WinTerminal *w,int bottom) {
+ GhosttyTerminalScrollViewport p={.tag=bottom?GHOSTTY_SCROLL_VIEWPORT_BOTTOM:GHOSTTY_SCROLL_VIEWPORT_TOP};
+ ghostty_terminal_scroll_viewport(w->term,p);
+}
+API void gw_reset_terminal(WinTerminal *w,int full) {
+ ghostty_selection_gesture_reset(w->gesture,w->term);
+ if(full)ghostty_terminal_reset(w->term);
+ else {
+  ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_SELECTION,NULL);
+  gw_scroll_edge(w,1);
+  const uint8_t clear[]="\x1b[?2026l\x1b[2J\x1b[H";
+  ghostty_terminal_vt_write(w->term,clear,sizeof(clear)-1);
+ }
+}
 API int gw_title(WinTerminal *w,char *out,int cap) {
- GhosttyString s={0};ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_TITLE,&s);
- size_t n=s.len<(size_t)cap?s.len:(size_t)cap;if(n)memcpy(out,s.ptr,n);return (int)n;
+ GhosttyString s={0};int r=ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_TITLE,&s);
+ if(r==GHOSTTY_NO_VALUE)return 0;if(r || s.len>INT_MAX)return -1;
+ if(out && s.len<=(size_t)cap && s.len)memcpy(out,s.ptr,s.len);return (int)s.len;
 }
 API int gw_pwd(WinTerminal *w,char *out,int cap) {
- GhosttyString s={0};ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_PWD,&s);
- if(s.len>INT_MAX)return -1;
+ GhosttyString s={0};int r=ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_PWD,&s);
+ if(r==GHOSTTY_NO_VALUE)return 0;if(r || s.len>INT_MAX)return -1;
  if(s.len && out && s.len<=(size_t)cap)memcpy(out,s.ptr,s.len);return (int)s.len;
 }
 API void gw_select(WinTerminal *w,int x1,int y1,int x2,int y2) {
@@ -199,11 +274,30 @@ API void gw_select(WinTerminal *w,int x1,int y1,int x2,int y2) {
  if(ghostty_terminal_grid_ref(w->term,a,&selection.start) || ghostty_terminal_grid_ref(w->term,b,&selection.end))return;
  ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_SELECTION,&selection);
 }
+API int gw_clear_selection(WinTerminal *w,int keep_click_sequence) {
+ if(!keep_click_sequence)ghostty_selection_gesture_reset(w->gesture,w->term);
+ return ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_SELECTION,NULL);
+}
 API int gw_select_all(WinTerminal *w) {
  ghostty_selection_gesture_reset(w->gesture,w->term);
  GhosttySelection s=GHOSTTY_INIT_SIZED(GhosttySelection);
  int r=ghostty_terminal_select_all(w->term,&s);
  return r==GHOSTTY_SUCCESS?ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_SELECTION,&s):r==GHOSTTY_NO_VALUE?0:r;
+}
+API int gw_has_selection(WinTerminal *w) {
+ GhosttySelection s=GHOSTTY_INIT_SIZED(GhosttySelection);int r=ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_SELECTION,&s);
+ return r==GHOSTTY_SUCCESS?1:r==GHOSTTY_NO_VALUE?0:-1;
+}
+API int gw_selection_options(WinTerminal *w,const uint32_t *points,int count,int use_default,int repeat_ms,double distance) {
+ if(count<0 || repeat_ms<0 || distance<0)return GHOSTTY_INVALID_VALUE;
+ GhosttyCodepoints boundaries={.ptr=points,.len=(size_t)count};
+ for(int i=0;i<3;i++) {
+  if(i==1)continue;
+  int r=ghostty_selection_gesture_event_set(w->gesture_events[i],GHOSTTY_SELECTION_GESTURE_EVENT_OPT_WORD_BOUNDARY_CODEPOINTS,use_default?NULL:&boundaries);
+  if(r)return r;
+ }
+ w->repeat_interval=(uint64_t)repeat_ms*1000000;w->repeat_distance=distance;
+ ghostty_selection_gesture_reset(w->gesture,w->term);return GHOSTTY_SUCCESS;
 }
 API int gw_gesture(WinTerminal *w,int action,int x,int y,double px,double py,int cw,int height,int rectangle,uint64_t time_ns) {
  if(action<0||action>2||cw<=0||height<=0)return GHOSTTY_INVALID_VALUE;
@@ -217,8 +311,8 @@ API int gw_gesture(WinTerminal *w,int action,int x,int y,double px,double py,int
   if((r=ghostty_selection_gesture_event_set(e,GHOSTTY_SELECTION_GESTURE_EVENT_OPT_POSITION,&position)))return r;
  }
  if(action==0){
-  uint64_t time=time_ns?time_ns:GetTickCount64()*1000000,interval=(uint64_t)GetDoubleClickTime()*1000000;
-  double distance=GetSystemMetrics(SM_CXDOUBLECLK);
+  uint64_t time=time_ns?time_ns:GetTickCount64()*1000000,interval=w->repeat_interval?w->repeat_interval:(uint64_t)GetDoubleClickTime()*1000000;
+  double distance=w->repeat_distance>0?w->repeat_distance:GetSystemMetrics(SM_CXDOUBLECLK);
   if((r=ghostty_selection_gesture_event_set(e,GHOSTTY_SELECTION_GESTURE_EVENT_OPT_TIME_NS,&time)) ||
    (r=ghostty_selection_gesture_event_set(e,GHOSTTY_SELECTION_GESTURE_EVENT_OPT_REPEAT_INTERVAL_NS,&interval)) ||
    (r=ghostty_selection_gesture_event_set(e,GHOSTTY_SELECTION_GESTURE_EVENT_OPT_REPEAT_DISTANCE,&distance)))return r;
@@ -235,13 +329,51 @@ API int gw_gesture(WinTerminal *w,int action,int x,int y,double px,double py,int
  if(r==GHOSTTY_NO_VALUE && action==0)ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_SELECTION,NULL);
  return r==GHOSTTY_NO_VALUE?0:r;
 }
-API int gw_text(WinTerminal *w,int selection,char *out,int cap) {
+API int gw_text(WinTerminal *w,int selection,int format,int trim,char *out,int cap) {
  GhosttySelection current=GHOSTTY_INIT_SIZED(GhosttySelection);
- if(selection && ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_SELECTION,&current)!=GHOSTTY_SUCCESS)return 0;
+ if(selection==1){int result=ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_SELECTION,&current);if(result==GHOSTTY_NO_VALUE)return 0;if(result)return result;}
+ if(selection==2){
+  uint16_t cols=0,rows=0;ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_COLS,&cols);ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_ROWS,&rows);
+  GhosttyPoint a={.tag=GHOSTTY_POINT_TAG_VIEWPORT,.value.coordinate={0,0}},b={.tag=GHOSTTY_POINT_TAG_VIEWPORT,.value.coordinate={cols-1,rows-1}};
+  current.start=(GhosttyGridRef)GHOSTTY_INIT_SIZED(GhosttyGridRef);current.end=(GhosttyGridRef)GHOSTTY_INIT_SIZED(GhosttyGridRef);
+  if(ghostty_terminal_grid_ref(w->term,a,&current.start)||ghostty_terminal_grid_ref(w->term,b,&current.end))return -1;
+ }
+ if(selection<0||selection>2)return GHOSTTY_INVALID_VALUE;
  GhosttyFormatterTerminalOptions o=GHOSTTY_INIT_SIZED(GhosttyFormatterTerminalOptions);
- o.emit=GHOSTTY_FORMATTER_FORMAT_PLAIN;o.trim=true;o.unwrap=true;o.selection=selection?&current:NULL;
- GhosttyFormatter f=NULL;if(ghostty_formatter_terminal_new(NULL,&f,w->term,o))return -1;
- size_t n=0;ghostty_formatter_format_buf(f,(uint8_t*)out,cap,&n);ghostty_formatter_free(f);return n>2147483647?-1:(int)n;
+ if(format<0||format>2)return GHOSTTY_INVALID_VALUE;
+ o.extra=(GhosttyFormatterTerminalExtra)GHOSTTY_INIT_SIZED(GhosttyFormatterTerminalExtra);o.extra.palette=format>0;
+ o.emit=(GhosttyFormatterFormat)format;o.trim=trim!=0;o.unwrap=true;o.selection=selection?&current:NULL;
+ GhosttyFormatter f=NULL;int created=ghostty_formatter_terminal_new(NULL,&f,w->term,o);if(created)return created;
+ size_t n=0;int result=ghostty_formatter_format_buf(f,(uint8_t*)out,cap,&n);ghostty_formatter_free(f);
+ if(result!=GHOSTTY_SUCCESS && result!=GHOSTTY_OUT_OF_SPACE)return result;return n>2147483647?GHOSTTY_LIMIT_EXCEEDED:(int)n;
+}
+API int gw_navigate(WinTerminal *w,int operation,uint64_t row,int delta) {
+ GhosttyTerminalScrollViewport p={0};
+ if(operation==0){p.tag=GHOSTTY_SCROLL_VIEWPORT_ROW;p.value.row=(size_t)row;}
+ else if(operation==1){p.tag=GHOSTTY_SCROLL_VIEWPORT_DELTA_PROMPT;p.value.delta_prompt=delta;}
+ else if(operation==2||operation==3){
+  GhosttySelection s=GHOSTTY_INIT_SIZED(GhosttySelection);int r=ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_SELECTION,&s);
+  if(r)return r==GHOSTTY_NO_VALUE?0:r;
+  GhosttyPointCoordinate point; if((r=ghostty_terminal_point_from_grid_ref(w->term,operation==2?&s.start:&s.end,GHOSTTY_POINT_TAG_SCREEN,&point)))return r;
+  p.tag=GHOSTTY_SCROLL_VIEWPORT_ROW;p.value.row=point.y;
+ }else return GHOSTTY_INVALID_VALUE;
+ ghostty_terminal_scroll_viewport(w->term,p);return 0;
+}
+API int gw_adjust_selection(WinTerminal *w,int adjustment) {
+ if(adjustment<0||adjustment>9)return GHOSTTY_INVALID_VALUE;
+ ghostty_selection_gesture_reset(w->gesture,w->term);
+ GhosttySelection s=GHOSTTY_INIT_SIZED(GhosttySelection);int r=ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_SELECTION,&s);
+ if(r==GHOSTTY_NO_VALUE){
+  uint16_t x=0,y=0;ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_CURSOR_X,&x);ghostty_terminal_get(w->term,GHOSTTY_TERMINAL_DATA_CURSOR_Y,&y);
+  GhosttyPoint p={.tag=GHOSTTY_POINT_TAG_ACTIVE,.value.coordinate={x,y}};
+  s.start=(GhosttyGridRef)GHOSTTY_INIT_SIZED(GhosttyGridRef);if((r=ghostty_terminal_grid_ref(w->term,p,&s.start)))return r;s.end=s.start;
+ }else if(r)return r;
+ if((r=ghostty_terminal_selection_adjust(w->term,&s,(GhosttySelectionAdjust)adjustment)))return r;
+ return ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_SELECTION,&s);
+}
+API int gw_limits(WinTerminal *w,uint64_t history,uint64_t images,int unlimited_history) {
+ size_t bytes=(size_t)history;int r=ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_SCROLLBACK_MAX_BYTES,unlimited_history?NULL:&bytes);
+ if(r)return r;return ghostty_terminal_set(w->term,GHOSTTY_TERMINAL_OPT_KITTY_IMAGE_STORAGE_LIMIT,&images);
 }
 static GhosttyKey key(int vk) {
  if(vk>='A'&&vk<='Z')return GHOSTTY_KEY_A+(vk-'A');
@@ -373,5 +505,5 @@ API int gw_link(WinTerminal *w,int x,int y,char *out,int cap) {
  GhosttyPoint p={.tag=GHOSTTY_POINT_TAG_VIEWPORT,.value.coordinate={x,y}};
  if(ghostty_terminal_grid_ref(w->term,p,&ref))return 0;
  size_t n=0;int r=ghostty_grid_ref_hyperlink_uri(&ref,(uint8_t*)out,cap,&n);
- return (r==GHOSTTY_SUCCESS||r==GHOSTTY_OUT_OF_SPACE) && n<=INT_MAX?(int)n:0;
+ if(r==GHOSTTY_NO_VALUE)return 0;return (r==GHOSTTY_SUCCESS||r==GHOSTTY_OUT_OF_SPACE) && n<=INT_MAX?(int)n:-1;
 }

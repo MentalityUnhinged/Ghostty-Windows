@@ -26,6 +26,13 @@ static class SettingsTests
         var settings = Settings.LoadFile(path); var main = new MainWindow(settings, true); main.Show(); await Task.Delay(100);
         try
         {
+            var tabControl = Descendants<WorkspaceTabs>(main).Single();
+            var headers = (System.Windows.FrameworkElement)tabControl.Template.FindName("Headers", tabControl);
+            Check(headers.Visibility == Visibility.Collapsed, "Single tab hides the header strip");
+            main.NewTab("PowerShell", true); main.UpdateLayout();
+            Check(headers.Visibility == Visibility.Visible && headers.ActualHeight <= 24, $"Multiple tabs show a compact readable header strip ({headers.Visibility}, {headers.ActualHeight})");
+            settings.ConfirmClose = false; main.ClosePane(); settings.ConfirmClose = true; main.UpdateLayout();
+            Check(headers.Visibility == Visibility.Collapsed, "Closing to one tab reclaims the header space");
             var toolbar = Descendants<Button>(main).Single(b => b.Content as string == "Settings"); Click(toolbar); await Task.Delay(80);
             var editor = Application.Current.Windows.OfType<SettingsWindow>().Single();
             Check(editor.IsVisible && editor.Owner == main, "Real Settings toolbar button opens an owned settings editor");
@@ -39,13 +46,23 @@ static class SettingsTests
             Check(editor.Feedback.Text.Contains("absolute") && settings.FontSize == 15, "Invalid startup folder cannot partially apply appearance");
             editor.Folder.Text = folder; editor.Theme.SelectedItem = "Paper"; editor.Profile.SelectedItem = "Command Prompt";
             editor.ShowStatus.IsChecked = false; editor.CopyOnSelect.IsChecked = true; editor.ConfirmPaste.IsChecked = false;
+            editor.BackgroundEffect.SelectedItem = "Acrylic"; editor.BackgroundOpacity.Value = 37;
+            editor.ShowToolbar.IsChecked = false;
+            editor.ShowWelcome.IsChecked = false;
             editor.ConfirmClose.IsChecked = false; Click(editor.ApplyButton); await Task.Delay(60);
+            Check(settings.BackgroundEffect == "Acrylic" && settings.BackgroundOpacity == 37 && Settings.LoadFile(path).BackgroundOpacity == 37, "Background effect and slider persist through Settings Apply");
+            Check(main.Opacity == 1 && main.Active!.Opacity == 1, "Backdrop changes preserve foreground opacity");
             Check(editor.IsVisible && editor.Feedback.Text == "Settings saved." && settings.FontSize == 18 && settings.Theme == "Paper", "Apply persists valid settings and keeps the editor open");
             Check(main.Active!.Engine.Capture().Cells[0].Bg == settings.Colors.Bg, "Settings Apply changes the existing terminal engine theme");
-            Check(((DockPanel)main.Content).Children.OfType<TextBlock>().Single().Visibility == Visibility.Collapsed, "Status-bar setting applies immediately to the existing window");
+            Check(((DockPanel)main.Content).Children.OfType<TextBlock>().Single(t => DockPanel.GetDock(t) == Dock.Bottom).Visibility == Visibility.Collapsed, "Status-bar setting applies immediately to the existing window");
+            Check(!toolbar.IsVisible && !Settings.LoadFile(path).ShowToolbar, "Toolbar visibility applies immediately and survives reload");
             var loaded = Settings.LoadFile(path);
-            Check(loaded.CopyOnSelect && !loaded.ConfirmMultilinePaste && !loaded.ConfirmClose && !loaded.ShowStatusBar && loaded.WorkingDirectory == folder && loaded.DefaultProfile == "Command Prompt", "New behavior and launch settings survive file reload");
+            Check(loaded.CopyOnSelect && !loaded.ConfirmMultilinePaste && !loaded.ConfirmClose && !loaded.ShowStatusBar && !loaded.ShowWelcome && loaded.WorkingDirectory == folder && loaded.DefaultProfile == "Command Prompt", "New behavior and launch settings survive file reload");
             Check(File.ReadAllText(path + ".backup") == before && loaded.Extra!["VendorOptions"].GetProperty("Keep").GetInt32() == 42, "Settings editor keeps the prior file backup and unknown settings");
+            main.ExecuteCommand("show-toolbar");
+            Check(toolbar.IsVisible && Settings.LoadFile(path).ShowToolbar, "Palette toolbar toggle restores hidden controls and persists the preference");
+            var opaque = settings.Edit(); opaque.BackgroundEffect = "Solid"; settings.Commit(opaque);
+            Check(!main.BackdropActive && main.Background != Brushes.Transparent, "Switching Acrylic off restores an opaque client background without restarting panes");
             editor.Size.Text = "22"; Click(editor.CancelButton);
             Check(settings.FontSize == 18 && Settings.LoadFile(path).FontSize == 18, "Cancel discards edits made after Apply");
             Click(toolbar); editor = Application.Current.Windows.OfType<SettingsWindow>().Single(); editor.Size.Text = "19"; Click(editor.SaveButton);

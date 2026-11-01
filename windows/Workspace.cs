@@ -57,6 +57,7 @@ sealed class Workspace
     public double Width { get; set; } = 1160;
     public double Height { get; set; } = 760;
     public bool Maximized { get; set; }
+    internal Workspace Copy() { Validate(); return new Workspace { Version = Version, Tabs = Tabs.Select(t => new WorkspaceTab { Root = t.Root.Copy(), ActivePaneId = t.ActivePaneId, Name = t.Name }).ToArray(), SelectedTab = SelectedTab, Width = Width, Height = Height, Maximized = Maximized }; }
     public void Validate()
     {
         if (Version != 1) throw new InvalidDataException("Unsupported workspace version: " + Version);

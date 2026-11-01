@@ -16,16 +16,26 @@ try {
  if ($LASTEXITCODE) { throw 'Windows frontend build failed' }
  Copy-Item LICENSE windows/dist/GHOSTTY-LICENSE.txt -Force
  Copy-Item windows/README.md windows/dist/GHOSTTY-WINDOWS-README.md -Force
+ Copy-Item KEYBINDS.md windows/dist/KEYBINDS.md -Force
  Copy-Item windows/PORTING.md windows/dist/PORTING.md -Force
+ Copy-Item windows/AUDIT.md windows/dist/AUDIT.md -Force
+ Copy-Item windows/CONFIG_SUPPORT.md, windows/ACTION_SUPPORT.md, windows/VERIFICATION.md windows/dist/ -Force
  Copy-Item windows/Assets/ghostty.ico windows/dist/Ghostty.Windows.ico -Force
  & "$PSScriptRoot/verify-icon.ps1"
  # Reports from a previous binary must never ship as evidence for this build.
- foreach ($generated in @('windows/dist/test-results.json', 'windows/dist/rea-executable-evidence.json')) {
+ foreach ($generated in @('windows/dist/test-results.json', 'windows/dist/rea-executable-evidence.json', 'windows/dist/verification-results.json')) {
   if (Test-Path -LiteralPath $generated) { Remove-Item -LiteralPath $generated }
  }
+ $engineBase = (Get-Content -LiteralPath "$PSScriptRoot/engine-base.txt" -Raw).Trim()
+ & git diff --quiet $engineBase -- src include build.zig build.zig.zon
+ $engineSourceMatches = $LASTEXITCODE -eq 0
  @{
   upstream_repository = 'https://github.com/ghostty-org/ghostty'
-  upstream_commit = (& git rev-parse HEAD)
+  upstream_commit = $engineBase
+  frontend_commit = (& git rev-parse HEAD)
+  source_tree_dirty = [bool](& git status --porcelain)
+  engine_source_tree_matches_base = $engineSourceMatches
+  engine_archive_rebuilt_this_run = (-not $SkipCore)
   frontend = 'windows/'
   status = 'experimental-preview-not-feature-equivalent'
   target = 'x86_64-windows-gnu; baseline CPU'

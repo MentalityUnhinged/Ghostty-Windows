@@ -13,14 +13,22 @@ sealed class PseudoConsole : IDisposable
     IntPtr hpc, process, job;
     FileStream? input, output;
     readonly Channel<byte[]> writes = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(256) { FullMode = BoundedChannelFullMode.Wait, SingleReader = true });
-    Task reader = Task.CompletedTask, writer = Task.CompletedTask;
+    Task reader = Task.CompletedTask, writer = Task.CompletedTask, processMonitor = Task.CompletedTask;
+    internal const int MaxQueuedBytes = 4 * 1024 * 1024;
+    long queuedBytes;
+    internal long QueuedInputBytes => Interlocked.Read(ref queuedBytes);
+    string? writeFailure;
+    int startRequested;
     int disposed;
     public uint ProcessId { get; private set; }
     public Task Cleanup { get; private set; } = Task.CompletedTask;
     public event Action<byte[], int>? Data;
     public event Action<int>? Exited;
+    public event Action<string>? Failed;
     public void Start(string command, string directory, int cols, int rows)
     {
+        if (Volatile.Read(ref disposed) != 0) throw new ObjectDisposedException(nameof(PseudoConsole));
+        if (Interlocked.Exchange(ref startRequested, 1) != 0) throw new InvalidOperationException("A ConPTY owner can only start once.");
         IntPtr readIn = IntPtr.Zero, writeIn = IntPtr.Zero, readOut = IntPtr.Zero, writeOut = IntPtr.Zero, attrs = IntPtr.Zero, env = IntPtr.Zero;
         PROCESS_INFORMATION pi = default;
         try
@@ -36,19 +44,33 @@ sealed class PseudoConsole : IDisposable
             {
                 var b = new byte[65536];
                 try { int n; while ((n = output.Read(b, 0, b.Length)) > 0) Data?.Invoke(b, n); }
-                catch (IOException) { } catch (ObjectDisposedException) { }
+                catch (IOException e)
+                {
+                    bool knownExit = process != IntPtr.Zero && GetExitCodeProcess(process, out uint code) && code != 259;
+                    if (Volatile.Read(ref disposed) == 0 && !knownExit) Failed?.Invoke("Terminal output pipe failed: " + e.Message);
+                }
+                catch (ObjectDisposedException) { }
             });
             writer = Task.Run(async () =>
             {
-                try { await foreach (var b in writes.Reader.ReadAllAsync()) { input.Write(b, 0, b.Length); input.Flush(); } }
-                catch (IOException) { } catch (ObjectDisposedException) { }
+                try
+                {
+                    await foreach (var b in writes.Reader.ReadAllAsync())
+                    {
+                        try { input.Write(b, 0, b.Length); input.Flush(); }
+                        finally { Interlocked.Add(ref queuedBytes, -b.Length); }
+                    }
+                }
+                catch (Exception e) when (e is IOException or ObjectDisposedException)
+                { if (Volatile.Read(ref disposed) == 0) { Volatile.Write(ref writeFailure, e.Message); Failed?.Invoke("Terminal input pipe failed: " + e.Message); } }
+                finally { writes.Writer.TryComplete(); while (writes.Reader.TryRead(out var pending)) Interlocked.Add(ref queuedBytes, -pending.Length); }
             });
             nuint size = 0; InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref size);
             attrs = Marshal.AllocHGlobal(checked((int)size)); Check(InitializeProcThreadAttributeList(attrs, 1, 0, ref size));
             Check(UpdateProcThreadAttribute(attrs, 0, (IntPtr)0x20016, hpc, (nuint)IntPtr.Size, IntPtr.Zero, IntPtr.Zero));
             var si = new STARTUPINFOEX { StartupInfo = new STARTUPINFO { cb = Marshal.SizeOf<STARTUPINFOEX>() }, lpAttributeList = attrs };
             var environment = Environment.GetEnvironmentVariables().Cast<System.Collections.DictionaryEntry>().ToDictionary(e => (string)e.Key, e => (string)e.Value!, StringComparer.OrdinalIgnoreCase);
-            environment["TERM"] = "xterm-256color"; environment["COLORTERM"] = "truecolor"; environment["TERM_PROGRAM"] = "ghostty-windows";
+            environment["TERM"] = "xterm-256color"; environment["COLORTERM"] = "truecolor"; environment["TERM_PROGRAM"] = "ghostty-windows"; environment["TERM_PROGRAM_VERSION"] = HostIdentity.Version;
             env = Marshal.StringToHGlobalUni(string.Join('\0', environment.OrderBy(e => e.Key, StringComparer.OrdinalIgnoreCase).Select(e => e.Key + "=" + e.Value)) + "\0\0");
             Check(CreateProcessW(null, new StringBuilder(command), IntPtr.Zero, IntPtr.Zero, false, 0x80000 | 0x400 | 4, env, directory, ref si, out pi));
             process = pi.hProcess;
@@ -60,7 +82,7 @@ sealed class PseudoConsole : IDisposable
             if (ResumeThread(pi.hThread) == uint.MaxValue) throw new Win32Exception();
             CloseHandle(pi.hThread); pi.hThread = IntPtr.Zero;
             var watched = process;
-            _ = Task.Run(() => { WaitForSingleObject(watched, uint.MaxValue); GetExitCodeProcess(watched, out var code); if (Volatile.Read(ref disposed) == 0) Exited?.Invoke((int)code); });
+            processMonitor = Task.Run(() => { if (WaitForSingleObject(watched, uint.MaxValue) != 0) throw new Win32Exception(); Check(GetExitCodeProcess(watched, out var code)); if (Volatile.Read(ref disposed) == 0) Exited?.Invoke((int)code); });
         }
         catch { if (pi.hProcess != IntPtr.Zero) TerminateProcess(pi.hProcess, 1); Dispose(); throw; }
         finally
@@ -74,7 +96,10 @@ sealed class PseudoConsole : IDisposable
     public void Send(byte[] b)
     {
         if (b.Length == 0 || Volatile.Read(ref disposed) != 0) return;
-        if (!writes.Writer.TryWrite(b)) throw new IOException("Terminal input queue is full; wait for the shell to consume input.");
+        if (Volatile.Read(ref writeFailure) is string failure) throw new IOException("Terminal input pipe failed: " + failure);
+        long total = Interlocked.Add(ref queuedBytes, b.Length);
+        if (total > MaxQueuedBytes) { Interlocked.Add(ref queuedBytes, -b.Length); throw new IOException("Terminal input exceeds the 4 MiB queued-byte limit; wait for the shell to consume input."); }
+        if (!writes.Writer.TryWrite(b)) { Interlocked.Add(ref queuedBytes, -b.Length); throw new IOException("Terminal input queue is full or closed; wait for the shell to consume input."); }
     }
     public void Send(string s) => Send(Encoding.UTF8.GetBytes(s));
     public void Resize(int cols, int rows) { if (hpc != IntPtr.Zero && Volatile.Read(ref disposed) == 0) Marshal.ThrowExceptionForHR(ResizePseudoConsole(hpc, new COORD((short)cols, (short)rows))); }
@@ -87,9 +112,19 @@ sealed class PseudoConsole : IDisposable
         // ConPTY close may wait for a final pipe flush. The read pump stays alive.
         Cleanup = Task.Run(async () =>
         {
-            input?.Dispose(); if (console != IntPtr.Zero) ClosePseudoConsole(console);
-            output?.Dispose(); await Task.WhenAll(reader, writer);
-            if (process != IntPtr.Zero) { CloseHandle(process); process = IntPtr.Zero; }
+            // Closing ConPTY ends its pipe peers. Keep our streams alive until
+            // both pumps settle: concurrent FileStream.Dispose/Read can throw
+            // NotSupportedException as well as ObjectDisposedException.
+            try
+            {
+                if (console != IntPtr.Zero) ClosePseudoConsole(console);
+                await Task.WhenAll(reader, writer, processMonitor);
+            }
+            finally
+            {
+                input?.Dispose(); output?.Dispose();
+                if (process != IntPtr.Zero) { Check(CloseHandle(process)); process = IntPtr.Zero; }
+            }
         });
     }
     static void Check(bool success) { if (!success) throw new Win32Exception(Marshal.GetLastWin32Error()); }
@@ -108,12 +143,12 @@ sealed class PseudoConsole : IDisposable
     [DllImport("kernel32", SetLastError = true)] static extern bool UpdateProcThreadAttribute(IntPtr p, uint flags, IntPtr attr, IntPtr value, nuint size, IntPtr previous, IntPtr returned);
     [DllImport("kernel32")] static extern void DeleteProcThreadAttributeList(IntPtr p);
     [DllImport("kernel32", SetLastError = true, CharSet = CharSet.Unicode)] static extern bool CreateProcessW(string? app, StringBuilder command, IntPtr pa, IntPtr ta, bool inherit, uint flags, IntPtr environment, string directory, ref STARTUPINFOEX si, out PROCESS_INFORMATION pi);
-    [DllImport("kernel32")] static extern bool CloseHandle(IntPtr h);
+    [DllImport("kernel32", SetLastError = true)] static extern bool CloseHandle(IntPtr h);
     [DllImport("kernel32", SetLastError = true)] static extern IntPtr CreateJobObjectW(IntPtr a, string? name);
     [DllImport("kernel32", SetLastError = true)] static extern bool SetInformationJobObject(IntPtr job, int cls, ref JOBOBJECT_EXTENDED_LIMIT_INFORMATION info, uint size);
     [DllImport("kernel32", SetLastError = true)] static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
     [DllImport("kernel32")] static extern uint ResumeThread(IntPtr thread);
     [DllImport("kernel32")] static extern bool TerminateProcess(IntPtr process, uint code);
-    [DllImport("kernel32")] static extern uint WaitForSingleObject(IntPtr h, uint timeout);
-    [DllImport("kernel32")] static extern bool GetExitCodeProcess(IntPtr process, out uint code);
+    [DllImport("kernel32", SetLastError = true)] static extern uint WaitForSingleObject(IntPtr h, uint timeout);
+    [DllImport("kernel32", SetLastError = true)] static extern bool GetExitCodeProcess(IntPtr process, out uint code);
 }

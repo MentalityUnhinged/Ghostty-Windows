@@ -2,9 +2,6 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Security.Cryptography;
 
 namespace GhosttyWindows;
 
@@ -13,40 +10,19 @@ static class App
     [STAThread]
     public static void Main(string[] args)
     {
-        bool test = args.Contains("--self-test");
+        bool test = TestRunner.IsRequested(args);
         string artifacts = args.SkipWhile(x => x != "--artifacts").Skip(1).FirstOrDefault() ?? Path.Combine(AppContext.BaseDirectory, "artifacts");
         var app = new Application();
+        WheelScrolling.Register();
         app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Chrome.xaml") });
         if (test) app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        app.DispatcherUnhandledException += (_, e) => { Directory.CreateDirectory(Settings.Folder); File.AppendAllText(Path.Combine(Settings.Folder, "errors.log"), DateTimeOffset.Now + " " + e.Exception + "\n"); if (!test) Dialogs.Show(e.Exception.Message, "Ghostty Windows"); e.Handled = true; app.Shutdown(1); };
+        app.DispatcherUnhandledException += (_, e) => { Directory.CreateDirectory(Settings.Folder); File.AppendAllText(Path.Combine(Settings.Folder, "errors.log"), DateTimeOffset.Now + " " + e.Exception + "\n"); if (test) { Directory.CreateDirectory(artifacts); File.WriteAllText(Path.Combine(artifacts, "result.json"), JsonSerializer.Serialize(new { ok = false, error = e.Exception.ToString(), passed = SelfTest.Passed })); } else Dialogs.Show(e.Exception.Message, "Ghostty Windows"); e.Handled = true; app.Shutdown(1); };
         app.Startup += async (_, _) =>
         {
             try
             {
-                if (test)
-                {
-                    Directory.CreateDirectory(artifacts);
-                    await SelfTest.Run(artifacts);
-                    await GraphicsTests.Run(artifacts);
-                    await WorkspaceTests.Run(artifacts);
-                    await KeyboardTests.Run();
-                    await SettingsTests.Run(artifacts);
-                    await InteractionTests.Run();
-                    await ChromeTests.Run(artifacts);
-                    SystemTitleBar.VerifyFollowingChanges(); SelfTest.Passed.Add("Native title bar follows dark/light changes without changing Windows preferences");
-                    var window = new MainWindow(new Settings { ConfirmClose = false }, true);
-                    window.Show(); await Task.Delay(300); window.ExerciseLayout(); SelfTest.Passed.Add("Nested split, pane close, tab creation and tab close"); await Task.Delay(800);
-                    window.UpdateLayout();
-                    if (window.Icon == null) throw new Exception("Window icon not loaded");
-                    SelfTest.Passed.Add("Multi-resolution icon loads in WPF window");
-                    var bitmap = new RenderTargetBitmap((int)window.ActualWidth, (int)window.ActualHeight, 96, 96, PixelFormats.Pbgra32);
-                    bitmap.Render(window); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
-                    using (var file = File.Create(Path.Combine(artifacts, "preview.png"))) encoder.Save(file);
-                    var hashes = new[] { "Ghostty.Windows.exe", "Ghostty.Windows.dll", "ghostty-win.dll" }.ToDictionary(name => name, name => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, name)))).ToLowerInvariant());
-                    File.WriteAllText(Path.Combine(artifacts, "result.json"), JsonSerializer.Serialize(new { ok = true, tests = SelfTest.Passed, screenshot = "preview.png", artifacts = hashes }, new JsonSerializerOptions { WriteIndented = true }));
-                    window.Close(); app.Shutdown(0);
-                }
-                else { var settings = Settings.Load(); new MainWindow(settings, restore: settings.Workspace).Show(); }
+                if (test) { await TestRunner.Run(args, artifacts); app.Shutdown(0); }
+                else LaunchOptions.Start(args);
             }
             catch (Exception e)
             {
