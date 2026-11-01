@@ -396,7 +396,7 @@ visible beside their remaining extensions to preserve context.
   generated ZIPs, executables, local evidence and test outputs remain ignored.
 - [ ] **Partial:** Plan regular upstream merges/rebases and rerun the relevant
   interoperability and regression checks after engine/header changes.
-- [x] **Published 2026-11-01:** Registered a public fork of ghostty-org/ghostty with the Windows source/history and MIT attribution preserved. This is an independent community port, not an official Ghostty Windows release. The prior standalone development repository is retained privately as a backup.
+- [x] **Published 2026-11-01:** Registered a public fork of ghostty-org/ghostty with the Windows source/history and MIT attribution preserved. This is an independent community port, not an official Ghostty Windows release. The prior private standalone repository was deleted after the public source/history was verified.
 
 ## 16. Scope decisions and release exit criteria
 
