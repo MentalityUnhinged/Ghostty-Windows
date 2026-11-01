@@ -1,15 +1,24 @@
 # Ghostty Windows Preview
 
-Private development copy of [Ghostty](https://github.com/ghostty-org/ghostty),
-with an independent experimental Windows frontend in [`windows/`](windows/README.md).
-This is not an official Ghostty Windows release and does not yet have full
-feature parity. The original engine history and MIT license are retained.
+An independent experimental Windows fork of [Ghostty](https://github.com/ghostty-org/ghostty),
+with a Windows frontend powered by **libghostty-vt and ConPTY** in
+[`windows/`](windows/README.md). The upstream engine history, attribution and
+MIT license are retained.
 
-See [Windows build instructions](windows/README.md) and
-[port status and verification](windows/PORTING.md). The comprehensive outstanding
-feature backlog is in [TODO.md](TODO.md). The latest tested preview
-is **0.12.0**, with **409 passing checks**. Build outputs and local test artifacts
-are intentionally excluded from Git.
+This is a community Windows port, **not an official Ghostty release or an
+upstream endorsement**. It does not yet have full feature parity with the
+macOS/Linux applications.
+
+See [Windows build instructions](windows/README.md),
+[port status](windows/PORTING.md), the [verification matrix](windows/VERIFICATION.md)
+and the [remaining-work summary](TODO.md#current-picture).
+The latest tested preview is **0.13.0**: **442 regression checks**, **71 extended
+checks**, and a production scrollback-compression probe passed on the tested
+Windows 11 environment. Other OS/device configurations and broader conformance
+remain under verification; passing counts are not a claim of complete parity.
+
+Windows binaries are not yet published as GitHub Releases; use the build
+instructions above. Build outputs and local test traces are excluded from Git.
 
 The upstream README follows.
 

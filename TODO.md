@@ -33,11 +33,11 @@ also lacks them; they are not all mandatory for matching upstream Ghostty.
 | Missing | 47 | Absent capabilities or engineering work; some are optional/legacy compatibility |
 | Partial | 43 | Working features with specific extensions, refinements or release work left |
 | Verify | 25 | Coverage still incomplete; this does not mean the feature is absent |
-| Decision | 12 | Product/platform policy to settle before implementation |
-| **Total** | **127** | **Grouped checklist entries, not 127 missing terminal features** |
+| Decision | 11 | Product/platform policy to settle before implementation |
+| **Total** | **126** | **Grouped checklist entries, not 127 missing terminal features** |
 
 The published GitHub baseline had **173 open groups** (84 Missing, 49 Partial,
-28 Verify, 12 Decision). This reconciliation leaves **127**. That net reduction
+28 Verify, 12 Decision). This reconciliation leaves **126**. That net reduction
 includes one newly confirmed rectangle-operation gap. Many delivered features
 were subrequirements of a broader group, so a 20-feature batch did not necessarily
 close 20 whole backlog entries. The historical delivery tables are at the end.
@@ -105,7 +105,7 @@ of complete interoperability or daily-use readiness.
 | 12. Accessibility and localization — P1 | 2 | 2 | 1 | 0 |
 | 13. Diagnostics and developer tools — P1/P2 | 0 | 1 | 0 | 0 |
 | 14. Performance and compatibility validation — P0/P1 | 0 | 1 | 7 | 0 |
-| 15. Build, packaging and release — P0/P1 | 4 | 5 | 0 | 2 |
+| 15. Build, packaging and release — P0/P1 | 4 | 5 | 0 | 1 |
 | 16. Scope decisions and release exit criteria | 0 | 1 | 0 | 2 |
 | 17. VT engine capabilities and limitations — P1/P2 | 12 | 2 | 0 | 3 |
 | 18. VT engine-to-Windows integration gaps — P1 | 3 | 1 | 0 | 0 |
@@ -377,7 +377,7 @@ visible beside their remaining extensions to preserve context.
 ## 15. Build, packaging and release — P0/P1
 
 - [ ] **Missing:** Windows-specific CI that builds and runs real frontend tests;
-  inherited upstream workflows are currently disabled in the private repository.
+  inherited upstream workflows are disabled in the public fork until a deliberate Windows CI/release configuration is ready.
 - [ ] **Partial:** Document/validate a clean-machine pinned toolchain and dependency
   acquisition; current scripts default to this user's local tool directories.
 - [ ] **Partial:** Publish reproducible source/runtime provenance and checksums
@@ -396,9 +396,7 @@ visible beside their remaining extensions to preserve context.
   generated ZIPs, executables, local evidence and test outputs remain ignored.
 - [ ] **Partial:** Plan regular upstream merges/rebases and rerun the relevant
   interoperability and regression checks after engine/header changes.
-- [ ] **Decision:** When ready for public distribution, create an official public
-  Ghostty fork and transfer the Windows branch with its history. GitHub cannot
-  register this private copy as a private fork of the public upstream.
+- [x] **Published 2026-11-01:** Registered a public fork of ghostty-org/ghostty with the Windows source/history and MIT attribution preserved. This is an independent community port, not an official Ghostty Windows release. The prior standalone development repository is retained privately as a backup.
 
 ## 16. Scope decisions and release exit criteria
 
